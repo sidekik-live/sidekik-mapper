@@ -52,10 +52,23 @@ pnpm dev            # tsx watch, reads .env
 | `pnpm dev` | Run from source with reload (reads `.env`) |
 | `pnpm build` / `pnpm start` | Compile to `dist/` / run the compiled server |
 | `pnpm typecheck` | `tsc --noEmit` |
-| `pnpm test` | vitest, including the G1–G5 guardrail tests |
-| `pnpm dev:mock` | Run against Redis and the sidekik-platform dev fixtures, with brain, perception and gateway stubbed |
+| `pnpm test` | vitest (the G1–G5 guardrail tests join with ticket 3) |
+| `pnpm dev:mock` | Run against Redis only: no Supabase, dev env defaults, teammates' services stubbed |
+| `pnpm dev:replay <file.jsonl>` | Publish fixture events onto the bus (`--speed`, `--session`) |
 
-The service checks every env var at boot and exits with a list of the ones that are missing. Lifecycle events for sessions started with `mode:"replay"` are ignored.
+### Running without teammates' services
+
+```bash
+docker compose -f ../sidekik-platform/dev/docker-compose.yml up -d   # Redis
+pnpm dev:mock                                                         # prints the dev internal token
+pnpm dev:replay dev/fixtures/capture-lifecycle.jsonl --speed 5        # watch the log for "build job queued"
+```
+
+Brain, perception and the gateway phase API get stubs in the tickets that first call them.
+
+The service checks every env var at boot and exits with a list of the ones that are missing. `GET /healthz` returns `{ok, version, deps}`, with 503 when Redis or Supabase is down.
+
+Bus handling: every handler is idempotent on `event.id`, and every event of a replay session (`mode:"replay"`) is ignored. `task_done` queues a build job in an in-process queue: one active job per session, jobs for one session run in order, and on shutdown the service stops consuming, lets running jobs finish, then closes the bus.
 
 ## Roadmap
 
