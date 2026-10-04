@@ -5,6 +5,9 @@ import {
   type ExpertMemoryRow,
   type ExpertRow,
   type KbChunkRow,
+  type StepEvidenceRow,
+  type WorkMapGuardrailRow,
+  type WorkMapStepRow,
   type OffRecordSpanRow,
   type OpenItemRow,
   type QuestionRow,
@@ -29,6 +32,9 @@ export type MemoryData = {
   work_maps: WorkMapRow[];
   expert_memory: ExpertMemoryRow[];
   kb_chunks: KbChunkRow[];
+  work_map_steps: WorkMapStepRow[];
+  guardrails: WorkMapGuardrailRow[];
+  step_evidence: StepEvidenceRow[];
 };
 
 /** In-memory store for tests and `pnpm dev:mock`; `data` is exposed so callers can inspect writes. */
@@ -46,6 +52,9 @@ export function memoryStore(seed: Partial<MemoryData> = {}): Store & { data: Mem
     work_maps: [],
     expert_memory: [],
     kb_chunks: [],
+    work_map_steps: [],
+    guardrails: [],
+    step_evidence: [],
     ...structuredClone(seed),
   };
   const bySession = <T extends { session_id: string | null }>(rows: T[], sessionId: string) =>
@@ -126,6 +135,12 @@ export function memoryStore(seed: Partial<MemoryData> = {}): Store & { data: Mem
         .filter((h) => h.score > 0)
         .sort((a, b) => b.score - a.score)
         .slice(0, limit);
+    },
+    async replaceWorkMapRows(workMapId, rows) {
+      const other = <T extends { work_map_id: string }>(xs: T[]) => xs.filter((x) => x.work_map_id !== workMapId);
+      data.work_map_steps = [...other(data.work_map_steps), ...structuredClone(rows.steps)];
+      data.guardrails = [...other(data.guardrails), ...structuredClone(rows.guardrails)];
+      data.step_evidence = [...other(data.step_evidence), ...structuredClone(rows.evidence)];
     },
     async replaceKbChunks(workMapId, rows) {
       data.kb_chunks = [...data.kb_chunks.filter((c) => c.work_map_id !== workMapId), ...structuredClone(rows)];

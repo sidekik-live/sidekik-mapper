@@ -16,6 +16,7 @@ import {
   type TranscriptTurn,
   type WorkMap,
 } from '../contracts/index.js';
+import { syncWorkMapRows } from '../publish/rows.js';
 import { KeyedQueue } from '../services/keyed-queue.js';
 import { claudeUsageRecords, publishUsage, type ClaudeUsage } from '../services/usage.js';
 import type { OpenItemRow, Store, TranscriptTurnRow } from '../store/types.js';
@@ -442,6 +443,13 @@ export class DebriefDriver {
     st.workmap = { ...st.workmap, status: 'confirmed', confirmed_turn_id: turn.turn_id };
     await this.deps.store.updateWorkMap(st.workmap.id, { status: 'confirmed', json: st.workmap });
     st.log.info({ confirmed_turn_id: turn.turn_id }, 'work map confirmed');
+    // The Work Map page reads the normalized rows; publish writes them again in any case.
+    await syncWorkMapRows(this.deps.store, {
+      workmap: st.workmap,
+      orgId: st.session.org_id,
+      events: st.input.events,
+      expert: st.session.expert_name,
+    }).catch((err) => st.log.error({ err }, 'writing the Work Map rows failed; publish will write them'));
     this.end(st.session.id);
     try {
       const result = await this.deps.gateway.setPhase(st.session.id, { phase: 'confirmed' });

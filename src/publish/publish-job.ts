@@ -7,6 +7,7 @@ import type { ArtifactStore } from '../store/artifacts.js';
 import type { Store, WorkMapRow } from '../store/types.js';
 import { agentRules, compiledGuardrails } from './artifacts.js';
 import { kbChunks } from './chunks.js';
+import { syncWorkMapRows } from './rows.js';
 
 export type PublishDeps = { store: Store; bus: Bus; perception: PerceptionClient; artifacts: ArtifactStore };
 
@@ -29,8 +30,8 @@ export type PublishOutcome = {
 export const artifactDir = (row: Pick<WorkMapRow, 'org_id' | 'id' | 'version'>) => `org/${row.org_id}/${row.id}/v${row.version}`;
 
 /**
- * Publishes a confirmed Work Map (DESIGN §6): checks its rules, requests a clip per step, replaces
- * its search chunks, writes the three Storage files, marks it published and announces it on
+ * Publishes a confirmed Work Map (DESIGN §6): checks its rules, writes its normalized rows, requests
+ * a clip per step, replaces its search chunks, writes the three Storage files, marks it published and announces it on
  * `sk:workmap.published`. Storage and the row are written before the event, because voice loads
  * the map from Storage and tutor from the database when they see it.
  */
@@ -50,7 +51,16 @@ export function createPublishJob(deps: PublishDeps) {
     const failing = demo.filter((d) => !d.pass);
     if (failing.length > 0) log.warn({ demo_cases_failed: failing.map((d) => `${d.name}: ${d.problem}`) }, 'demo guardrail cases failing');
 
-    // 2. Clips: perception cuts them in the background. Without them the UI falls back to keyframes.
+    const [capture, expert] = await Promise.all([
+      row.session_id ? deps.store.loadCapture(row.session_id) : Promise.resolve({ answers: [], questions: [], screenEvents: [] }),
+      deps.store.getExpert(row.expert_id),
+    ]);
+    const expertName = expert?.display_name ?? 'the expert';
+
+    // 2. The normalized rows (steps, guardrails, evidence) before the clips, which reference steps.
+    const rows = await syncWorkMapRows(deps.store, { workmap, orgId: row.org_id, events: capture.screenEvents, expert: expertName });
+
+    // 3. Clips: perception cuts them in the background. Without them the UI falls back to keyframes.
     let clipsJobId: string | null = null;
     if (row.session_id && workmap.steps.length > 0) {
       try {
@@ -61,22 +71,20 @@ export function createPublishJob(deps: PublishDeps) {
       }
     }
 
-    // 3. Search chunks for recall_context.
-    const capture = row.session_id ? await deps.store.loadCapture(row.session_id) : { answers: [], questions: [] };
+    // 4. Search chunks for recall_context.
     const chunks = kbChunks({ workmap, orgId: row.org_id, answers: capture.answers, questions: capture.questions });
     await deps.store.replaceKbChunks(row.id, chunks);
 
-    // 4. Storage artifacts.
-    const expert = await deps.store.getExpert(row.expert_id);
+    // 5. Storage artifacts.
     const dir = artifactDir(row);
     const files: [string, string, string][] = [
       ['workmap.json', JSON.stringify(workmap, null, 2), 'application/json'],
-      ['AGENT_RULES.md', agentRules(workmap, expert?.display_name ?? 'the expert'), 'text/markdown; charset=utf-8'],
+      ['AGENT_RULES.md', agentRules(workmap, expertName), 'text/markdown; charset=utf-8'],
       ['guardrails.jsonlogic.json', JSON.stringify(compiledGuardrails(workmap), null, 2), 'application/json'],
     ];
     for (const [name, body, contentType] of files) await deps.artifacts.put(`${dir}/${name}`, body, contentType);
 
-    // 5. Published, then announced. (6. expert memory comes with its own ticket.)
+    // 6. Published, then announced. (Expert memory comes with its own ticket.)
     await deps.store.updateWorkMap(row.id, { status: 'published', json: workmap, published_at: new Date().toISOString() });
     await deps.bus.publish(
       STREAMS.workmapPublished,
@@ -92,7 +100,17 @@ export function createPublishJob(deps: PublishDeps) {
 
     const paths = files.map(([name]) => `${dir}/${name}`);
     log.info(
-      { workmap_id: row.id, workmap_version: row.version, chunks: chunks.length, clips_job_id: clipsJobId, paths, demo_cases_failed: failing.length },
+      {
+        workmap_id: row.id,
+        workmap_version: row.version,
+        steps: rows.steps.length,
+        guardrails: rows.guardrails.length,
+        evidence: rows.evidence.length,
+        chunks: chunks.length,
+        clips_job_id: clipsJobId,
+        paths,
+        demo_cases_failed: failing.length,
+      },
       'work map published',
     );
     return { workmap, paths, chunks: chunks.length, clips_job_id: clipsJobId, demo };
