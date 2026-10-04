@@ -1,0 +1,25 @@
+# Deploys this service to Railway (project "sidekik", service "sidekik-mapper") on every push to main,
+# i.e. every merged PR. Railway builds the repo's Dockerfile; the service's variables live in Railway.
+# Repo secret: RAILWAY_TOKEN (a Railway project token for sidekik / production).
+name: Deploy to Railway
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-railway
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # --ci streams the build logs and fails the job if the deploy fails.
+      - name: Deploy
+        run: npx -y @railway/cli@latest up --ci --service sidekik-mapper
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
