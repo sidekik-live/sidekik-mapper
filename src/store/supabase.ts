@@ -141,6 +141,10 @@ export function supabaseStore(db: SupabaseClient): Store {
       return unwrap<OpenItemRow[]>(res, 'load open items');
     },
 
+    async updateOpenItemStatus(id, status) {
+      unwrap(await db.from('open_items').update({ status }).eq('id', id), 'update open item');
+    },
+
     async replaceOpenItems(workMapId, rows) {
       // Not atomic: a failure between the two leaves the map with no open items, and the
       // build retry (task_done redelivery) rewrites them from the Work Map JSON.

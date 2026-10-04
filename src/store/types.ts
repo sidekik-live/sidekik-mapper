@@ -131,6 +131,7 @@ export interface Store {
   updateWorkMap(id: string, patch: Pick<WorkMapRow, 'status' | 'json'>): Promise<void>;
   /** The Work Map's open items, most important first. */
   listOpenItems(workMapId: string): Promise<OpenItemRow[]>;
+  updateOpenItemStatus(id: string, status: OpenItemRow['status']): Promise<void>;
   /** Replaces every open item of the Work Map with `rows`. */
   replaceOpenItems(workMapId: string, rows: OpenItemRow[]): Promise<void>;
   getExpertMemory(expertId: string, workflowId: string): Promise<ExpertMemoryRow | null>;

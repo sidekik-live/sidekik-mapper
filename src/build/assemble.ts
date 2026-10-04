@@ -1,11 +1,20 @@
 import { randomUUID } from 'node:crypto';
 import type { Evidence, Guardrail, JsonLogic, OpenItem, Step, WorkMap } from '../contracts/index.js';
 import type { OpenItemRow } from '../store/types.js';
-import type { WorkMapDraft } from './draft-schema.js';
+import type { GuardrailDraft, WorkMapDraft } from './draft-schema.js';
 import type { BuildInput } from './gather.js';
 import { mmss } from './prompt.js';
 
 const IMPORTANCE = { high: 3, medium: 2, low: 1 } as const;
+
+/** The model's consequence (lists and nulls, for structured output) as the contract's shape. */
+export function toConsequence(c: GuardrailDraft['consequence']): Guardrail['consequence'] {
+  return {
+    ...(c.require.length > 0 && { require: Object.fromEntries(c.require.map((r) => [r.field, r.value])) }),
+    ...(c.block && { block: true }),
+    ...(c.action && { action: c.action }),
+  };
+}
 
 /** "Sabine · 03:12": who said it and when, for the UI next to a quote. */
 export const sourceLabel = (expert: string, t_ms: number | undefined) =>
@@ -102,7 +111,6 @@ export function assembleWorkMap(args: {
         t_ms: event?.t_ms ?? turnTime(e.turn_id) ?? 0,
       };
     });
-    const { require, block, action } = g.consequence;
     return {
       id: guardrailIds.get(g.key)!,
       key: g.key,
@@ -110,11 +118,7 @@ export function assembleWorkMap(args: {
       description: g.description,
       // parseDraft already checked that rule_json is a JSON object.
       rule: JSON.parse(g.rule_json) as JsonLogic,
-      consequence: {
-        ...(require.length > 0 && { require: Object.fromEntries(require.map((r) => [r.field, r.value])) }),
-        ...(block && { block: true }),
-        ...(action && { action }),
-      },
+      consequence: toConsequence(g.consequence),
       quote: g.quote,
       quote_en: g.quote_en,
       evidence,

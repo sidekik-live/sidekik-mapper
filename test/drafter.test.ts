@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it } from 'vitest';
-import { claudeDrafter, DraftRefusedError, parseDraft } from '../src/build/drafter.js';
+import { claudeDrafter, parseDraft } from '../src/build/drafter.js';
+import { ClaudeRefusedError } from '../src/services/claude.js';
 import type { ClaudeUsage } from '../src/services/usage.js';
 import { silentLog } from './helpers.js';
 
@@ -79,12 +80,12 @@ describe('claudeDrafter', () => {
 
   it('gives up after the second invalid draft', async () => {
     const { result } = await run([{ text: 'not json' }, { text: 'still not json' }]);
-    await expect(result).rejects.toThrow(/failed validation twice: The response was not valid JSON/);
+    await expect(result).rejects.toThrow(/Work Map draft failed validation twice: The response was not valid JSON/);
   });
 
   it('does not retry a refusal', async () => {
     const { result, requests } = await run([{ stop_reason: 'refusal', category: 'general_harms' }, { text: DRAFT }]);
-    await expect(result).rejects.toBeInstanceOf(DraftRefusedError);
+    await expect(result).rejects.toBeInstanceOf(ClaudeRefusedError);
     expect(requests).toHaveLength(1);
   });
 });

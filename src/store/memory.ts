@@ -100,6 +100,10 @@ export function memoryStore(seed: Partial<MemoryData> = {}): Store & { data: Mem
     async listOpenItems(workMapId) {
       return structuredClone(data.open_items.filter((o) => o.work_map_id === workMapId)).sort((a, b) => b.importance - a.importance);
     },
+    async updateOpenItemStatus(id, status) {
+      const row = data.open_items.find((o) => o.id === id);
+      if (row) row.status = status;
+    },
     async replaceOpenItems(workMapId, rows) {
       data.open_items = [...data.open_items.filter((o) => o.work_map_id !== workMapId), ...structuredClone(rows)];
     },

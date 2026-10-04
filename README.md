@@ -63,11 +63,12 @@ pnpm dev            # tsx watch, reads .env
 docker compose -f ../sidekik-platform/dev/docker-compose.yml up -d   # Redis
 pnpm dev:mock                                                         # prints the dev internal token
 pnpm dev:replay dev/fixtures/capture_sabine.jsonl --speed 50          # task_done → draft → validated → "debrief requested"
+pnpm dev:replay dev/fixtures/debrief_sabine.jsonl                     # 3 follow-ups → teach-back → "work map confirmed"
 ```
 
 `dev/fixtures/capture_sabine.json` is Sabine's 3-invoice capture session as the database holds it after capture (screen events, turns with an off-record span, brain's questions and answers, an open item from an earlier session). `pnpm dev:mock` drafts with Claude when `ANTHROPIC_API_KEY` is set, otherwise it replays the recorded draft in `dev/fixtures/sabine-draft.json`. `capture-lifecycle.jsonl` exercises the bus routing (replay sessions ignored, duplicates dropped).
 
-In the mock, brain answers D6 with a fixed score and the gateway phase call is logged instead of sent.
+In the mock, brain is a stand-in (D6 keeps every item, D12 never ends early, D8 confirms a plain yes), the gateway phase calls are logged instead of sent, and without `ANTHROPIC_API_KEY` answers don't change the map and the teach-back is a template. Replay `debrief_sabine.jsonl` at speed 1: its gaps exceed the 2 s silence that ends an answer.
 
 The service checks every env var at boot and exits with a list of the ones that are missing. `GET /healthz` returns `{ok, version, deps}`, with 503 when Redis or Supabase is down.
 
@@ -80,6 +81,16 @@ Build job (`src/build/`), DESIGN §4:
 3. **Validate** in code (`validate.ts`): unknown event and turn IDs are dropped, quotes must be verbatim in the cited turn (re-cited or replaced otherwise), rules must parse and read only `InvoiceState` variables, and every step and guardrail keeps a screen event and the expert's words; what can't be repaired becomes an open item. The G1–G5 demo cases (`src/guardrails/demo-cases.ts`) run against the result and are logged.
 4. **Score** open items with brain's D6 and drop the trivial ones (never below three; kept as-is if brain is down).
 5. **Hand over**: status `in_debrief`, then gateway `POST /internal/sessions/:id/phase` `{phase: "debrief", dynamic_variables: {open_items, prior_summary}}`. If the gateway call fails, the map goes back to `draft` and a redelivered `task_done` resumes from it without drafting again.
+
+Debrief driver (`src/debrief/`), DESIGN §5, a state machine per session (`waiting_greeting → followups → confirming → confirmed`):
+
+1. **Greeting:** after `phase_changed` to `debrief`, wait for the agent's first turn (90 s, then start anyway).
+2. **Follow-ups:** publish `followup` for the most important open item; an answer ends after 2 s of the expert's silence; no answer in 60 s asks again once, then moves on. Each answer goes to a small Sonnet patch (`PATCH_MODEL`) that sets a step's reason, adds evidence to a guardrail or adds a guardrail; the map is validated again and saved. Judgment calls without a reason become open items. D12 tells whether the expert says that's everything.
+3. **Coverage:** at least 3 follow-ups and no high-importance item left (or the expert is done after 3), at most 6.
+4. **Teach-back:** a 60–90 s script written from the Work Map JSON in the expert's language (template if Claude fails), sent once every answer is in the map. Talk while the agent reads it isn't taken as the reply.
+5. **Confirmation:** D8 on the reply. `confirmed`/`confirmed_minor` at ≥0.80 saves `confirmed_turn_id`, sets the map `confirmed` and requests the gateway's `confirmed` phase; anything else asks again, three times at most, then the map stays `in_debrief`. If brain is unreachable, a plain yes ("Ja, passt.") still confirms. Corrections are asked again for now; the patch-and-restate loop is the next ticket.
+
+The driver's state is in memory: a restart mid-debrief loses it, and the map stays `in_debrief`.
 
 ## Roadmap
 

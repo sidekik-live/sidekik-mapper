@@ -26,7 +26,7 @@ export function fixtureDrafter(name = 'sabine-draft.json'): Drafter {
     async draft() {
       const parsed = parseDraft(readFileSync(fixture(name), 'utf8'));
       if (!parsed.ok) throw new Error(`fixture ${name} is not a valid draft: ${parsed.problem}`);
-      return { draft: parsed.draft, attempts: 1 };
+      return { draft: parsed.value, attempts: 1 };
     },
   };
 }
