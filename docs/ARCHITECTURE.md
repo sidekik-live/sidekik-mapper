@@ -1,4 +1,4 @@
-# Sidekik: System Architecture (v0.2)
+# Sidekik: System Architecture (v0.3)
 
 > **Sidekik** is an AI apprentice. It watches an expert work on their screen and asks why at the right moments. It turns that session into a Work Map, then coaches the next hire through the same work on their own screen.
 > Hack-Nation 7th Global AI Hackathon, Challenge 01 (ElevenLabs) · Domain: **sidekik.live** (Cloudflare) · Team: **Sahil, Aadil, Mayukh**
@@ -163,6 +163,8 @@ Each stream is capped with `MAXLEN ~ 10000`. Consumers use `XREADGROUP` with `BL
 | meetbot → perception | `WS /internal/frames/:sid` | streaming |
 | gateway, perception → Presidio | analyzer / anonymizer / image-redactor | 300 ms |
 
+Request/response schemas for every endpoint above are in `@sidekik/contracts` (`contracts/api.ts`). Shapes marked draft there are for the owning service to confirm.
+
 ### 4.4 Auth
 
 | Hop | Mechanism |
@@ -255,7 +257,10 @@ type AgentCommand =
 
 type DecisionRequest  = { session_id: string; decisions: { id: DecisionId; state: unknown }[] };
 type DecisionResult   = { id: DecisionId; answer: string|number|boolean; probabilities?: Record<string,number>;
-  confidence: number; provider: "jev"|"openrouter-jev"|"llm"; escalated: boolean; latency_ms: number };
+  confidence: number; provider: "jev"|"openrouter-jev"|"llm"; escalated: boolean; latency_ms: number;
+  answers?: Record<string, QuestionAnswer> };   // every question of the decision; `answer` is the first question's
+type QuestionAnswer   = { answer: string|number|boolean; confidence: number; probabilities?: Record<string,number>;
+  p_true?: number /* noul */; score?: number /* score: weighted level, 1-based */ };
 type DecisionId = "D1"|"D2"|"D3"|"D4"|"D5"|"D6"|"D7"|"D8"|"D9"|"D10"|"D11"|"D12";
 
 type WorkMapPublished = { workmap_id: string; workflow_id: string; version: number };
@@ -409,11 +414,12 @@ sequenceDiagram
 ## 10. Conventions (all repos)
 
 - **Stack:**
-  - Node 20, TypeScript (strict), Fastify, zod, pino, vitest, and Docker (`node:20-slim`).
+  - Node 22, TypeScript (strict), Fastify, zod, pino, vitest, and Docker (`node:22-slim`). Node 20 reached end of life in April 2026, and current `@supabase/supabase-js` requires Node ≥ 22.
   - `GET /healthz` returns `{ok, version, deps}`.
 - **Repo setup:**
   - `.env.example` lists every variable; `src/env.ts` validates them with zod at boot.
-  - `@sidekik/contracts` is pinned to a git tag: `"@sidekik/contracts": "github:<org>/sidekik-platform#v0.1.0"`.
+  - `@sidekik/contracts` is pinned to a git tag: `"@sidekik/contracts": "github:sidekik-live/sidekik-platform#v0.1.0"`.
+  - Release tags carry a prebuilt `dist/`, so installing runs no build step. pnpm 10 blocks build scripts in git dependencies, which is why the build is prebuilt. Pin tags only; branches have no `dist/`.
   - If the platform repo is private, add a read-only `NPM_GITHUB_TOKEN` to Railway build variables.
 - **Logging:** every log line includes `session_id`, `org_id`, `event_id` (when there is one), and `latency_ms`.
 - **Git:**

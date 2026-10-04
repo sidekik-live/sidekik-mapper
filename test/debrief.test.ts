@@ -126,6 +126,7 @@ describe('debrief driver', () => {
 
     expect(s.map()).toMatchObject({ status: 'confirmed' });
     expect(s.map().json).toMatchObject({ status: 'confirmed', confirmed_turn_id: yes });
+    expect(s.map().confirmed_turn_id).toBe(yes); // the column, not only the JSON
     // The Work Map page can show it now: rows written on confirmation, G6 included.
     expect(s.store.data.guardrails.map((g) => g.key)).toEqual(['G1', 'G2', 'G4', 'G5', 'G6']);
     expect(s.store.data.step_evidence.find((e) => e.guardrail_id === g.id)).toMatchObject({ transcript_turn_id: 'db-3', screen_event_id: 'se-02' });
@@ -415,6 +416,11 @@ describe('debrief driver', () => {
     s.map().status = 'draft';
     await s.start();
     expect(s.driver.active(SABINE.session)).toBe(false);
+
+    // A session the database doesn't know is skipped, not retried into the dead-letter stream.
+    await expect(
+      s.driver.start(lifecycleEvent({ event: 'phase_changed', phase: 'debrief' }, '00000000-0000-4000-8000-0000000000ff'), silentLog()),
+    ).resolves.toBeUndefined();
   });
 });
 

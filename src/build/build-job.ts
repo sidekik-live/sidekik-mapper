@@ -33,7 +33,8 @@ type CaptureSession = SessionRow & { expert_id: string };
 export function createBuildJob(deps: BuildDeps) {
   return async function build(ev: Envelope<SessionLifecycle>, log: FastifyBaseLogger): Promise<BuildOutcome> {
     const found = await deps.store.getSession(ev.session_id);
-    if (!found) throw new Error(`session ${ev.session_id} not found`);
+    // No sessions row (e.g. a fixture replayed straight onto the bus): nothing a retry could fix.
+    if (!found) return skip(log, `session ${ev.session_id} not found`);
     if (found.kind !== 'capture' || found.mode === 'replay') {
       return skip(log, `not a live capture session (${found.kind}, ${found.mode})`);
     }

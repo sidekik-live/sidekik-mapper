@@ -95,6 +95,25 @@ describe('publish job', () => {
     expect(s.store.data.step_evidence.every((e) => !e.step_id || s.store.data.work_map_steps.some((st) => st.id === e.step_id))).toBe(true);
   });
 
+  it('retires the previous published version and its search chunks', async () => {
+    const s = await confirmedSabine();
+    const v0 = { ...s.row, id: '00000000-0000-4000-8000-0000000000f0', version: 0, status: 'published' as const, json: { ...s.row.json, status: 'published' as const } };
+    s.store.data.work_maps.push(v0);
+    s.store.data.kb_chunks.push({ id: 'old', org_id: SABINE.org, workflow_id: SABINE.workflow, work_map_id: v0.id, kind: 'step', ref_id: 'x', content: 'old' });
+
+    await s.publish(s.row.id, silentLog());
+    expect(s.store.data.work_maps.find((m) => m.id === v0.id)).toMatchObject({ status: 'retired', json: { status: 'retired' } });
+    expect(s.store.data.kb_chunks.every((c) => c.work_map_id === s.row.id)).toBe(true);
+    expect(s.store.data.work_maps[0]!.status).toBe('published');
+  });
+
+  it('refuses a map the WorkMap contract would reject', async () => {
+    const s = await confirmedSabine();
+    s.row.json.steps[0]!.guardrail_ids = ['not-a-uuid'];
+    await expect(s.publish(s.row.id, silentLog())).rejects.toThrow(/does not match the WorkMap contract: steps\.0\.guardrail_ids\.0/);
+    expect(s.artifacts.files.size).toBe(0);
+  });
+
   it('requests one clip per step around its screen moment', async () => {
     const s = await confirmedSabine();
     const outcome = await s.publish(s.row.id, silentLog());

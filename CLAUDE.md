@@ -7,7 +7,7 @@ Part of **Sidekik**, an AI apprentice (sidekik.live). Team: Sahil, Aadil, Mayukh
 @docs/SCHEMA.md
 
 ## Rules for Claude Code in this repo
-- Stack: Node 20, TypeScript strict, Fastify, zod, pino, vitest, pnpm. Listen on host `::` and `PORT`.
+- Stack: Node 22, TypeScript strict, Fastify, zod, pino, vitest, pnpm. Listen on host `::` and `PORT`.
 - Build the tickets in docs/DESIGN.md in order; one PR per ticket or two; conventional commits.
 - Import every payload type, stream name, and the bus/auth helpers from `@sidekik/contracts` (pinned git tag). Never redefine a contract locally. If one is missing, stop and draft an issue for sidekik-platform.
 - Write only to the tables this service owns (ARCHITECTURE §6, SCHEMA.md). You may read any table.

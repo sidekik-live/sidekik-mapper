@@ -5,10 +5,11 @@ import type { ScreenEventRow, SessionRow, Store } from '../store/types.js';
 import { overlap, words } from './words.js';
 
 export type RecallScope = 'session' | 'workflow';
+/** One entry of `RecallContextResponseSchema` (sidekik-platform api.ts). */
 export type Snippet = {
   text: string;
-  /** Session time of a screen event or turn; null for published knowledge. */
-  t_ms: number | null;
+  /** Session time of a screen event or turn; absent for published knowledge. */
+  t_ms?: number;
   source: 'kb:step' | 'kb:guardrail' | 'kb:answer' | 'screen' | 'transcript';
 };
 
@@ -86,7 +87,7 @@ export async function recallContext(
   if (picked.length === 0) picked.push(...events.slice(0, FALLBACK_EVENTS));
 
   log.info({ scope, query_words: q.length, kb: kb.length, matches: matches.length, returned: picked.length }, 'recall_context');
-  return { snippets: picked.map(({ text, t_ms, source }) => ({ text, t_ms, source })) };
+  return { snippets: picked.map(({ text, t_ms, source }) => ({ text, ...(t_ms !== undefined && { t_ms }), source })) };
 }
 
 /** search_kb() hits, scaled so the best one scores 1 (ts_rank and trigram similarity differ in range). */
@@ -100,7 +101,7 @@ async function searchKb(store: Store, session: SessionRow, query: string, log: F
       }),
     ]);
     const best = Math.max(...hits.map((h) => h.score), Number.EPSILON);
-    return hits.map((h) => ({ text: h.content, t_ms: null, source: `kb:${h.kind}`, score: Math.max(h.score / best, Number.EPSILON) }));
+    return hits.map((h) => ({ text: h.content, source: `kb:${h.kind}`, score: Math.max(h.score / best, Number.EPSILON) }));
   } catch (err) {
     log.warn({ err }, 'search_kb failed; answering from the session only');
     return [];

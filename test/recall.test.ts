@@ -5,6 +5,7 @@ import { stubGateway } from '../src/clients/gateway.js';
 import { stubPerception } from '../src/clients/perception.js';
 import { fixtureDrafter, SABINE, sabineCapture } from '../src/dev/fixtures.js';
 import { createPublishJob } from '../src/publish/publish-job.js';
+import { RecallContextResponseSchema } from '../src/contracts/index.js';
 import { recallContext } from '../src/recall/recall.js';
 import { overlap, words } from '../src/recall/words.js';
 import { memoryArtifacts } from '../src/store/artifacts.js';
@@ -31,7 +32,9 @@ describe('recall_context', () => {
     const { recall } = await publishedSabine();
     const { snippets } = await recall('Kranbau Dezember', 'workflow');
     expect(snippets.length).toBeLessThanOrEqual(5);
-    expect(snippets[0]).toMatchObject({ source: expect.stringMatching(/^kb:/), t_ms: null, text: expect.stringContaining('Kranbau') });
+    expect(snippets[0]).toMatchObject({ source: expect.stringMatching(/^kb:/), text: expect.stringContaining('Kranbau') });
+    expect(snippets[0]).not.toHaveProperty('t_ms');
+    expect(RecallContextResponseSchema.parse({ snippets })).toEqual({ snippets });
     expect(snippets.map((s) => s.source)).toEqual(expect.arrayContaining(['kb:step', 'kb:guardrail', 'kb:answer', 'screen']));
     expect(snippets).toContainEqual({
       text: '01:00 record_opened invoice 4480 (Kranbau GmbH, 1980 EUR, services, DE01, cost center 4711, month 12)',

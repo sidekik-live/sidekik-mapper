@@ -315,10 +315,14 @@ create table kb_chunks (              -- + base
 create index on kb_chunks using gin (tsv);
 create index on kb_chunks using gin (content gin_trgm_ops);   -- fuzzy fallback (typos, partial words)
 
--- recall_context query (mapper): full-text first, trigram similarity as fallback
+-- recall_context query (mapper): full-text first, trigram word similarity as fallback.
+-- Word similarity (<%), not whole-string similarity (%): a short query against a long chunk never reaches
+-- the whole-string threshold, so typos would never match. 0.4 finds typo'd words ("Anlagenumer", "Kranbua").
 create or replace function search_kb(p_org uuid, p_workflow uuid, p_query text, p_limit int default 5)
 returns table (id uuid, kind text, ref_id uuid, content text, score real)
-language sql stable as $$
+language sql stable
+set pg_trgm.word_similarity_threshold = 0.4
+as $$
   with fts as (
     select k.id, k.kind, k.ref_id, k.content,
            ts_rank(k.tsv, websearch_to_tsquery('simple', p_query)) as score
@@ -326,11 +330,11 @@ language sql stable as $$
     where k.org_id = p_org and k.workflow_id = p_workflow
       and k.tsv @@ websearch_to_tsquery('simple', p_query)
   ), trgm as (
-    select k.id, k.kind, k.ref_id, k.content, similarity(k.content, p_query) as score
+    select k.id, k.kind, k.ref_id, k.content, word_similarity(p_query, k.content) as score
     from kb_chunks k
     where k.org_id = p_org and k.workflow_id = p_workflow
       and not exists (select 1 from fts)
-      and k.content % p_query
+      and p_query <% k.content
   )
   select * from fts union all select * from trgm
   order by score desc limit p_limit;
@@ -414,6 +418,9 @@ $$;
 --   alter table <t> enable row level security;
 --   create policy org_read on <t> for select using (is_member(org_id));
 -- orgs: create policy org_read on orgs for select using (is_member(id));
+-- Exception: agent_host_tokens gets RLS but NO policy. They are one-time credentials, read only by the
+-- gateway (service role); an org_read policy would let any member claim an agent-host session.
+-- is_member/has_role are SECURITY DEFINER: pin `set search_path = ''` and schema-qualify public.org_members.
 
 -- Learner privacy (replace org_read on these two):
 create policy learner_own on learner_attempts for select using (

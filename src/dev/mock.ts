@@ -17,6 +17,8 @@ import { stubPerception } from '../clients/perception.js';
 import { claudeComparator, structuralComparator } from '../compare/compare.js';
 import { createBus } from '../contracts/index.js';
 import { loadEnv } from '../env.js';
+import { createServiceLogger } from '../logger.js';
+import { redisHealth } from '../redis-health.js';
 import { plainYes } from '../debrief/driver.js';
 import { claudeAnswerPatcher, claudeCorrectionPatcher, noopCorrector, noopPatcher } from '../debrief/patch.js';
 import { claudeTeachbackWriter, templateTeachback } from '../debrief/teachback.js';
@@ -63,13 +65,11 @@ const devDecider: Decider = {
 const store = memoryStore(sabineCapture());
 const OUT = new URL('../../dev/out/', import.meta.url).pathname;
 
-let app: Awaited<ReturnType<typeof buildApp>>;
-const bus = createBus(env.REDIS_URL, 'mapper', {
-  warn: (obj, msg) => app.log.warn(obj, msg),
-  error: (obj, msg) => app.log.error(obj, msg),
-});
+const log = createServiceLogger(env.LOG_LEVEL);
+const bus = createBus(env.REDIS_URL, 'mapper', { logger: log.child({ component: 'bus' }) });
+const redis = redisHealth(env.REDIS_URL, log);
 
-app = await buildApp({
+const app = await buildApp({
   env,
   bus,
   handlers: createHandlers({
@@ -77,7 +77,7 @@ app = await buildApp({
     drafter: useClaude ? claudeDrafter({ apiKey: env.ANTHROPIC_API_KEY, model: env.BUILDER_MODEL }) : fixtureDrafter(),
     bus,
     decider: devDecider,
-    gateway: stubGateway((sessionId, body) => app.log.info({ session_id: sessionId, ...body }, 'stub gateway: phase')),
+    gateway: stubGateway((sessionId, body) => log.info({ session_id: sessionId, ...body }, 'stub gateway: phase')),
     patcher: useClaude ? claudeAnswerPatcher({ apiKey: env.ANTHROPIC_API_KEY, model: env.PATCH_MODEL }) : noopPatcher,
     corrector: useClaude ? claudeCorrectionPatcher({ apiKey: env.ANTHROPIC_API_KEY, model: env.PATCH_MODEL }) : noopCorrector,
     teachback: useClaude
@@ -90,18 +90,16 @@ app = await buildApp({
     store,
     bus,
     perception: stubPerception((sessionId, items) =>
-      app.log.info({ session_id: sessionId, clips: items.length }, 'stub perception: clips requested'),
+      log.info({ session_id: sessionId, clips: items.length }, 'stub perception: clips requested'),
     ),
     artifacts: fileArtifacts(OUT),
   }),
   healthChecks: {
-    redis: async () => {
-      await bus.redis.ping();
-    },
+    redis: redis.check,
   },
-  logger: { level: env.LOG_LEVEL, transport: { target: 'pino-pretty' } },
+  loggerInstance: log,
 });
-bus.redis.on('error', (err) => app.log.warn({ err: err.message }, 'redis error'));
+app.addHook('onClose', redis.close);
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, async () => {

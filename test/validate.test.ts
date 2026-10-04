@@ -9,6 +9,9 @@ import { WorkMapSchema } from '../src/contracts/index.js';
 import { SABINE, sabineCapture } from '../src/dev/fixtures.js';
 import { memoryStore } from '../src/store/memory.js';
 
+/** The platform's WorkMapSchema requires a UUID id. */
+const WM = '00000000-0000-4000-8000-0000000000aa';
+
 const sabineDraft = (): WorkMapDraft =>
   JSON.parse(readFileSync(new URL('../dev/fixtures/sabine-draft.json', import.meta.url), 'utf8')) as WorkMapDraft;
 
@@ -18,7 +21,7 @@ async function validate(edit: (draft: WorkMapDraft) => void = () => {}) {
   const { input } = await gather(store, { ...session, expert_id: session.expert_id! }, renderInput);
   const draft = sabineDraft();
   edit(draft);
-  const assembled = assembleWorkMap({ id: 'wm-1', version: 1, input, draft });
+  const assembled = assembleWorkMap({ id: WM, version: 1, input, draft });
   let n = 0;
   return validateWorkMap({ workmap: assembled.workmap, openItems: assembled.openItems, input, newId: () => `new-${++n}` });
 }
@@ -50,7 +53,7 @@ describe('validateWorkMap', () => {
       importance: 3,
       origin: 'builder',
       anchor_t_ms: 70_000,
-      work_map_id: 'wm-1',
+      work_map_id: WM,
     });
     expect(workmap.open_items.map((o) => o.id)).toEqual(openItems.map((o) => o.id));
   });
