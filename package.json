@@ -24,6 +24,7 @@
     "@supabase/supabase-js": "^2",
     "fastify": "^5",
     "fastify-type-provider-zod": "^4",
+    "fflate": "^0.8.3",
     "ioredis": "^5",
     "json-logic-js": "^2",
     "ulid": "^2",

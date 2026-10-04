@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { HttpError, notFound } from '../errors.js';
+import { agentExport, EXPORTABLE } from '../publish/export.js';
 import { PUBLISHABLE } from '../publish/publish-job.js';
 import { recallContext } from '../recall/recall.js';
 import type { JobFn, JobRunner } from '../services/jobs.js';
@@ -63,6 +64,30 @@ export const internalRoutes: FastifyPluginAsync<InternalRoutesOptions> = async (
       if (!session) throw notFound('Session not found');
       request.log = request.log.child({ session_id: session.id, org_id: session.org_id });
       return recallContext({ store: opts.store }, { session, query, scope }, request.log);
+    },
+  );
+
+  // Gateway proxies `GET /v1/workmaps/:id/export` here and relays the body and headers (5 s budget).
+  app.get(
+    '/internal/workmaps/:id/export',
+    {
+      onRequest: app.requireInternal,
+      schema: { params: z.object({ id: z.string().min(1) }), querystring: z.object({ format: z.enum(['agent']).default('agent') }) },
+    },
+    async (request, reply) => {
+      const row = await opts.store.getWorkMap(request.params.id);
+      if (!row) throw notFound('Work Map not found');
+      request.log = request.log.child({ workmap_id: row.id, org_id: row.org_id, session_id: row.session_id });
+      if (!(EXPORTABLE as readonly string[]).includes(row.status)) {
+        throw new HttpError(409, 'not_confirmed', `Work Map is ${row.status}; it can be exported once the expert confirms it`);
+      }
+      const expert = await opts.store.getExpert(row.expert_id);
+      const { filename, zip } = agentExport(row.json, expert?.display_name ?? 'the expert');
+      request.log.info({ filename, bytes: zip.byteLength }, 'agent rules exported');
+      return reply
+        .header('content-type', 'application/zip')
+        .header('content-disposition', `attachment; filename="${filename}"`)
+        .send(Buffer.from(zip));
     },
   );
 };
