@@ -4,7 +4,7 @@ import { D6_HAS_GAPS, stubDecider, type Decider } from '../src/clients/brain.js'
 import { stubGateway, type PhaseRequest } from '../src/clients/gateway.js';
 import { makeEvent, STREAMS, type AgentCommand, type QuestionAnswer, type TranscriptTurn } from '../src/contracts/index.js';
 import { DebriefDriver, plainYes } from '../src/debrief/driver.js';
-import type { AnswerPatch, AnswerPatcher } from '../src/debrief/patch.js';
+import { noopCorrector, type AnswerPatch, type AnswerPatcher, type Correction, type CorrectionPatcher } from '../src/debrief/patch.js';
 import { fixtureDrafter, SABINE, sabineCapture } from '../src/dev/fixtures.js';
 import { runDemoCases } from '../src/guardrails/demo-cases.js';
 import { memoryStore } from '../src/store/memory.js';
@@ -44,7 +44,7 @@ const patcher = (): AnswerPatcher & { calls: string[] } => {
   };
 };
 
-async function setup(opts: { decider?: Decider; patcher?: AnswerPatcher } = {}) {
+async function setup(opts: { decider?: Decider; patcher?: AnswerPatcher; corrector?: CorrectionPatcher } = {}) {
   const store = memoryStore(sabineCapture());
   const bus = fakeBus();
   const phases: PhaseRequest[] = [];
@@ -53,7 +53,15 @@ async function setup(opts: { decider?: Decider; patcher?: AnswerPatcher } = {}) 
   const build = createBuildJob({ store, bus, gateway, decider, drafter: fixtureDrafter() });
   await build({ ...lifecycleEvent({ event: 'task_done', phase: 'building' }, SABINE.session), t_ms: 145_000 }, silentLog());
   const p = opts.patcher ?? patcher();
-  const driver = new DebriefDriver({ store, bus, gateway, decider, patcher: p, teachback: { write: async () => 'SCRIPT' } });
+  const driver = new DebriefDriver({
+    store,
+    bus,
+    gateway,
+    decider,
+    patcher: p,
+    corrector: opts.corrector ?? noopCorrector,
+    teachback: { write: async () => 'SCRIPT' },
+  });
 
   let t = 200_000;
   let n = 0;
@@ -187,6 +195,135 @@ describe('debrief driver', () => {
     await s.turn('user', 'Doch, stimmt so.');
     await vi.advanceTimersByTimeAsync(2_000);
     expect(s.map().status).toBe('confirmed');
+  });
+
+  describe('corrections', () => {
+    /** brain: D6/D12 as usual, D8 answers from the queue in order. */
+    const d8Queue = (...answers: string[]): Decider => {
+      const base = stubDecider({ D6: D6_HAS_GAPS, D12: NOT_DONE });
+      return {
+        async decide(sid, decisions) {
+          if (decisions[0]!.id !== 'D8') return base.decide(sid, decisions);
+          return stubDecider({ D8: d8(answers.shift() ?? 'unclear') }).decide(sid, decisions);
+        },
+      };
+    };
+    const correction = (over: Partial<Correction> = {}): Correction => ({
+      set_reasons: [],
+      add_evidence: [],
+      add_guardrails: [],
+      update_steps: [],
+      update_guardrails: [],
+      remove_steps: [],
+      remove_guardrails: [],
+      restatement: 'Verstanden: Ausrüstung ist erst ab 10.000 Euro Capex.',
+      ...over,
+    });
+    const raiseG1 = (turnId: string): Partial<Correction> => ({
+      update_guardrails: [
+        {
+          guardrail_key: 'G1',
+          description: 'Equipment over €10,000 net is capex on cost center 0400.',
+          rule_json: '{"and":[{">":[{"var":"net_amount"},10000]},{"==":[{"var":"category"},"equipment"]},{"!=":[{"var":"cost_center"},"0400"]}]}',
+          consequence: null,
+          quote: 'Ausrüstung ist erst ab 10.000 Euro Capex',
+          quote_en: 'Equipment only counts as capex from €10,000',
+          turn_id: turnId,
+        },
+      ],
+    });
+
+    /** Runs the follow-ups and has the agent read the teach-back. */
+    async function toTeachback(s: Awaited<ReturnType<typeof setup>>) {
+      await s.start();
+      await s.turn('agent', 'Hallo!');
+      for (const a of ['a', 'b', 'c']) await s.answer(a);
+      await s.turn('agent', 'So machen Sie das: …');
+    }
+    const CORRECTION_TEXT = 'Nein, Ausrüstung ist erst ab 10.000 Euro Capex.';
+
+    it('patches the map, restates only the correction, and confirms on the next yes', async () => {
+      const calls: { script: string; correction: string[] }[] = [];
+      const corrector: CorrectionPatcher = {
+        async correct({ script, correction: turns }) {
+          calls.push({ script, correction: turns.map((t) => t.text) });
+          return correction(raiseG1(turns[0]!.turn_id));
+        },
+      };
+      const s = await setup({ decider: d8Queue('corrected', 'confirmed'), corrector });
+      await toTeachback(s);
+      const fix = await s.turn('user', CORRECTION_TEXT);
+      await vi.advanceTimersByTimeAsync(2_000);
+
+      expect(calls).toEqual([{ script: 'SCRIPT', correction: [CORRECTION_TEXT] }]);
+      expect(s.commands().at(-1)).toEqual({
+        type: 'teachback',
+        workmap_id: s.map().id,
+        script: 'Verstanden: Ausrüstung ist erst ab 10.000 Euro Capex.',
+      });
+      const g1 = s.map().json.guardrails.find((g) => g.key === 'G1')!;
+      expect(g1.rule).toMatchObject({ and: [{ '>': [{ var: 'net_amount' }, 10000] }, expect.anything(), expect.anything()] });
+      expect(g1.evidence.at(-1)).toMatchObject({ turn_id: fix });
+      expect(s.map().status).toBe('in_debrief');
+
+      await s.turn('agent', 'Verstanden: …');
+      const yes = await s.turn('user', 'Ja, jetzt passt es.');
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(s.map()).toMatchObject({ status: 'confirmed', json: { confirmed_turn_id: yes } });
+    });
+
+    it('restates from the map when part of the correction did not apply', async () => {
+      const corrector: CorrectionPatcher = {
+        async correct({ correction: turns }) {
+          return correction({ ...raiseG1(turns[0]!.turn_id), update_steps: [{ step_key: 'S9', title: 'x', decision: null }] });
+        },
+      };
+      const s = await setup({ decider: d8Queue('corrected'), corrector });
+      await toTeachback(s);
+      await s.turn('user', CORRECTION_TEXT);
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(s.commands().at(-1)).toMatchObject({
+        type: 'teachback',
+        script: "I've corrected it. Equipment over €10,000 net is capex on cost center 0400.",
+      });
+    });
+
+    it('asks again when the correction changes nothing or cannot be applied', async () => {
+      const failing: CorrectionPatcher = {
+        correct: async () => {
+          throw new Error('sonnet timed out');
+        },
+      };
+      for (const corrector of [noopCorrector, failing]) {
+        const s = await setup({ decider: d8Queue('corrected'), corrector });
+        await toTeachback(s);
+        await s.turn('user', CORRECTION_TEXT);
+        await vi.advanceTimersByTimeAsync(2_000);
+        expect(s.commands().at(-1)).toMatchObject({ type: 'teachback', script: expect.stringMatching(/^Kurze Rückfrage/) });
+        expect(s.map().status).toBe('in_debrief');
+      }
+    });
+
+    it('stops after two correction loops, leaving the map in debrief', async () => {
+      let n = 0;
+      const corrector: CorrectionPatcher = {
+        async correct({ correction: turns }) {
+          n++;
+          return correction(raiseG1(turns[0]!.turn_id));
+        },
+      };
+      const s = await setup({ decider: d8Queue('corrected', 'corrected', 'corrected'), corrector });
+      await toTeachback(s);
+      for (let i = 0; i < 3; i++) {
+        await s.turn('user', CORRECTION_TEXT);
+        await vi.advanceTimersByTimeAsync(2_000);
+        await s.turn('agent', 'Verstanden: …');
+      }
+      expect(n).toBe(2);
+      expect(s.commands().filter((c) => c.type === 'teachback')).toHaveLength(3); // script + 2 restatements
+      expect(s.map().status).toBe('in_debrief');
+      expect(s.driver.active(SABINE.session)).toBe(false);
+    });
   });
 
   it('confirms a plain yes when brain is unreachable, but not a yes-but', async () => {

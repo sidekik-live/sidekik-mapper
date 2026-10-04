@@ -19,7 +19,15 @@ import {
 import { KeyedQueue } from '../services/keyed-queue.js';
 import { claudeUsageRecords, publishUsage, type ClaudeUsage } from '../services/usage.js';
 import type { OpenItemRow, Store, TranscriptTurnRow } from '../store/types.js';
-import { applyAnswerPatch, type AnswerPatcher, type DebriefTurn } from './patch.js';
+import {
+  applyMapPatch,
+  templateRestatement,
+  type AnswerPatcher,
+  type CorrectionPatcher,
+  type DebriefTurn,
+  type MapPatch,
+  type Touched,
+} from './patch.js';
 import { reconfirmScript, type TeachbackWriter } from './teachback.js';
 
 export type DebriefTiming = {
@@ -41,6 +49,8 @@ export const MAX_FOLLOWUPS = 6;
 /** A follow-up is asked at most twice; the teach-back confirmation at most three times. */
 const MAX_FOLLOWUP_ASKS = 2;
 const MAX_CONFIRM_ASKS = 3;
+/** DESIGN §5: a corrected teach-back is patched and restated at most twice. */
+export const MAX_CORRECTIONS = 2;
 /** brain's act bands (sidekik-brain DESIGN §5): Choice ≥0.80, Noul ≥0.85. */
 const CHOICE_CONFIDENT = 0.8;
 const NOUL_TRUE = 0.85;
@@ -51,6 +61,7 @@ export type DebriefDeps = {
   decider: Decider;
   gateway: GatewayClient;
   patcher: AnswerPatcher;
+  corrector: CorrectionPatcher;
   teachback: TeachbackWriter;
   timing?: Partial<DebriefTiming>;
 };
@@ -68,8 +79,10 @@ type State = {
   current?: { item: OpenItemRow; turns: DebriefTurn[]; asks: number };
   /** The reply to the teach-back; collected only once the agent has spoken it (`spoken`). */
   reply?: { turns: DebriefTurn[]; spoken: boolean };
+  /** What the expert is confirming: the teach-back, then each restatement of a correction. */
   script?: string;
   confirmAsks: number;
+  corrections: number;
   /** Every expert turn of the debrief, so validation accepts quotes from it. */
   debriefTurns: DebriefTurn[];
   expertDone: boolean;
@@ -86,7 +99,7 @@ type State = {
 
 /**
  * DESIGN §5 as a state machine per capture session:
- * waiting_greeting → followups → (teachback) confirming → confirmed.
+ * waiting_greeting → followups → (teachback) confirming ⇄ (correction, restated) → confirmed.
  * Every event of a session (turns, timers) runs through one queue, so the state never interleaves.
  * State lives in memory: a restart mid-debrief loses it, and the Work Map stays `in_debrief`.
  */
@@ -130,6 +143,7 @@ export class DebriefDriver {
         phase: 'waiting_greeting',
         asked: 0,
         confirmAsks: 0,
+        corrections: 0,
         debriefTurns: [],
         expertDone: false,
         lastT: ev.t_ms,
@@ -278,30 +292,30 @@ export class DebriefDriver {
       st.log,
       (usage) => this.usage(st, usage),
     );
-    const applied = applyAnswerPatch({
-      workmap: st.workmap,
-      patch,
-      answer,
-      events: st.input.events,
-      expert: st.session.expert_name,
-    });
+    if (patch.resolves_item) item.status = 'resolved';
+    const result = await this.applyAndSave(st, patch, answer);
+    st.log.info({ open_item_id: item.id, resolved: patch.resolves_item, ...result }, 'answer integrated');
+  }
+
+  /** Applies a patch, validates the map again (debrief turns count as evidence) and saves it. */
+  private async applyAndSave(
+    st: State,
+    patch: MapPatch,
+    turns: DebriefTurn[],
+  ): Promise<{ changes: string[]; warnings: string[]; issues: string[]; touched: Touched }> {
+    const applied = applyMapPatch({ workmap: st.workmap, patch, turns, events: st.input.events, expert: st.session.expert_name });
     const validated = validateWorkMap({
       workmap: applied.workmap,
       openItems: st.items,
       input: { ...st.input, turns: [...st.input.turns, ...st.debriefTurns.map((t) => asTurnRow(st, t))] },
     });
-
     const known = new Set(st.items.map((o) => o.id));
     st.items.push(...validated.openItems.filter((o) => !known.has(o.id)));
-    if (patch.resolves_item) item.status = 'resolved';
     st.workmap = withOpenItems(validated.workmap, st.items);
 
     await this.deps.store.replaceOpenItems(st.workmap.id, st.items);
     await this.deps.store.updateWorkMap(st.workmap.id, { status: 'in_debrief', json: st.workmap });
-    st.log.info(
-      { open_item_id: item.id, resolved: patch.resolves_item, changes: applied.changes, warnings: applied.warnings, issues: validated.issues },
-      'answer integrated',
-    );
+    return { changes: applied.changes, warnings: applied.warnings, issues: validated.issues, touched: applied.touched };
   }
 
   /** Judgment calls the map has no reason for become open items, so coverage asks for them. */
@@ -356,10 +370,7 @@ export class DebriefDriver {
     if ((answer === 'confirmed' || answer === 'confirmed_minor') && confidence >= CHOICE_CONFIDENT) {
       return this.confirm(st, turns[turns.length - 1]!);
     }
-    if (answer === 'corrected' && confidence >= CHOICE_CONFIDENT) {
-      // The patch-and-restate loop for corrections replaces this.
-      return this.reconfirm(st, 'the expert corrected the teach-back; corrections are not applied yet');
-    }
+    if (answer === 'corrected' && confidence >= CHOICE_CONFIDENT) return this.correct(st, turns);
     return this.reconfirm(st, 'the reply did not settle the teach-back');
   }
 
@@ -375,6 +386,43 @@ export class DebriefDriver {
     return plainYes(reply)
       ? { answer: 'confirmed', confidence: CHOICE_CONFIDENT, source: 'fallback' }
       : { answer: 'unclear', confidence: 0, source: 'fallback' };
+  }
+
+  /**
+   * DESIGN §5: a correction is patched into the map and only the corrected part is restated, then
+   * D8 runs on the next reply. The model's restatement is used only when the whole patch applied
+   * cleanly; otherwise it is rebuilt from what actually changed, so confirming it confirms the map.
+   */
+  private async correct(st: State, turns: DebriefTurn[]): Promise<void> {
+    if (st.corrections >= MAX_CORRECTIONS) {
+      st.log.warn({ corrections: st.corrections }, 'corrected again after the last correction loop; the Work Map stays in debrief');
+      this.end(st.session.id);
+      return;
+    }
+    st.corrections++;
+    await st.patches;
+    let result: Awaited<ReturnType<DebriefDriver['applyAndSave']>>;
+    let restatement: string;
+    try {
+      const correction = await this.deps.corrector.correct(
+        { workmap: st.workmap, script: st.script ?? '', correction: turns, events: st.input.events, language: st.session.language },
+        st.log,
+        (usage) => this.usage(st, usage),
+      );
+      restatement = correction.restatement.trim();
+      result = await this.applyAndSave(st, correction, turns);
+    } catch (err) {
+      st.log.error({ err }, 'correction could not be applied');
+      return this.reconfirm(st, 'the correction could not be applied');
+    }
+    if (result.changes.length === 0) return this.reconfirm(st, 'the correction changed nothing in the map');
+
+    const clean = result.warnings.length === 0 && result.issues.length === 0 && restatement !== '';
+    st.script = clean ? restatement : templateRestatement(st.workmap, result.touched);
+    st.reply = { turns: [], spoken: false };
+    await this.command(st, { type: 'teachback', workmap_id: st.workmap.id, script: st.script });
+    st.log.info({ correction: st.corrections, restatement: clean ? 'model' : 'template', ...result }, 'correction applied and restated');
+    this.schedule(st, this.timing.replyMs, () => this.reconfirm(st, 'no reply to the restatement'));
   }
 
   private async reconfirm(st: State, why: string): Promise<void> {

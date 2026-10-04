@@ -5,7 +5,7 @@ import { assembleWorkMap } from '../src/build/assemble.js';
 import type { WorkMapDraft } from '../src/build/draft-schema.js';
 import { gather } from '../src/build/gather.js';
 import { renderInput } from '../src/build/prompt.js';
-import { applyAnswerPatch, parsePatch, type AnswerPatch } from '../src/debrief/patch.js';
+import { applyMapPatch, parseCorrection, parsePatch, templateRestatement, type AnswerPatch } from '../src/debrief/patch.js';
 import { claudeTeachbackWriter, reconfirmScript, templateTeachback } from '../src/debrief/teachback.js';
 import { SABINE, sabineCapture } from '../src/dev/fixtures.js';
 import { memoryStore } from '../src/store/memory.js';
@@ -24,13 +24,13 @@ async function sabine() {
 const answer = [{ turn_id: 'db-1', text: 'Ohne Lieferantennummer frage ich den Controller. Und bei Kranbau prüfe ich auf Duplikate.', t_ms: 250_000 }];
 const none: AnswerPatch = { resolves_item: true, set_reasons: [], add_evidence: [], add_guardrails: [] };
 
-describe('applyAnswerPatch', () => {
+describe('applyMapPatch', () => {
   it('sets reasons, adds evidence and new guardrails with the next key', async () => {
     const { workmap, input } = await sabine();
     const g4 = workmap.guardrails.find((g) => g.key === 'G4')!;
-    const { workmap: patched, changes, warnings } = applyAnswerPatch({
+    const { workmap: patched, changes, warnings } = applyMapPatch({
       workmap,
-      answer,
+      turns: answer,
       events: input.events,
       expert: 'Sabine',
       newId: () => 'g-new',
@@ -76,9 +76,9 @@ describe('applyAnswerPatch', () => {
 
   it('skips references to unknown steps, guardrails and non-answer turns', async () => {
     const { workmap, input } = await sabine();
-    const { changes, warnings } = applyAnswerPatch({
+    const { changes, warnings } = applyMapPatch({
       workmap,
-      answer,
+      turns: answer,
       events: input.events,
       expert: 'Sabine',
       patch: {
@@ -91,7 +91,82 @@ describe('applyAnswerPatch', () => {
       },
     });
     expect(changes).toEqual([]);
-    expect(warnings).toEqual(['reason for S9: unknown step', 'reason for S2: tt-03 is not an answer turn', 'evidence for G9: unknown guardrail']);
+    expect(warnings).toEqual([
+      'reason for S9: unknown step',
+      'reason for S2: tt-03 is not an expert turn of this exchange',
+      'evidence for G9: unknown guardrail',
+    ]);
+  });
+});
+
+describe('applyMapPatch with a correction', () => {
+  const correction = [{ turn_id: 'db-9', text: 'Nein, Ausrüstung ist erst ab 10.000 Euro Capex. Und den Schritt mit dem Speichern brauchst du nicht.', t_ms: 300_000 }];
+
+  it('rewrites a guardrail with the correction as evidence, and removes what the expert rejects', async () => {
+    const { workmap, input } = await sabine();
+    const g1 = workmap.guardrails.find((g) => g.key === 'G1')!;
+    const { workmap: patched, changes, warnings, touched } = applyMapPatch({
+      workmap,
+      turns: correction,
+      events: input.events,
+      expert: 'Sabine',
+      patch: {
+        ...none,
+        update_steps: [{ step_key: 'S2', title: null, decision: 'Re-coded equipment over €10,000 to capex (0400)' }],
+        update_guardrails: [
+          {
+            guardrail_key: 'G1',
+            description: 'Equipment over €10,000 net is capex on cost center 0400.',
+            rule_json: '{"and":[{">":[{"var":"net_amount"},10000]},{"==":[{"var":"category"},"equipment"]},{"!=":[{"var":"cost_center"},"0400"]}]}',
+            consequence: null,
+            quote: 'Ausrüstung ist erst ab 10.000 Euro Capex',
+            quote_en: 'Equipment only counts as capex from €10,000',
+            turn_id: 'db-9',
+          },
+        ],
+        remove_steps: ['S6'],
+        remove_guardrails: ['G5'],
+      },
+    });
+    expect(warnings).toEqual([]);
+    expect(changes).toEqual(['S6: removed', 'G5: removed', 'S2: updated', 'G1: corrected']);
+    expect(touched).toEqual({
+      steps: ['S2'],
+      guardrails: ['G1'],
+      removed: ['Save the coded invoice', 'Invoices for the Czech subsidiary always need a second approval.'],
+    });
+    const updated = patched.guardrails.find((g) => g.key === 'G1')!;
+    expect(updated.rule).toMatchObject({ and: [{ '>': [{ var: 'net_amount' }, 10000] }, expect.anything(), expect.anything()] });
+    expect(updated.consequence).toEqual(g1.consequence); // null keeps it
+    expect(updated.quote).toBe('Ausrüstung ist erst ab 10.000 Euro Capex');
+    expect(updated.evidence.at(-1)).toEqual({ turn_id: 'db-9', t_ms: 300_000 });
+    expect(patched.steps.map((s) => s.key)).not.toContain('S6');
+    expect(patched.guardrails.map((g) => g.key)).toEqual(['G1', 'G2', 'G4']);
+    expect(patched.steps.find((s) => s.key === 'S5')!.guardrail_ids).toEqual([]);
+
+    expect(templateRestatement(patched, touched)).toBe(
+      "I've corrected it. Code equipment over €5,000 as capex: Re-coded equipment over €10,000 to capex (0400). " +
+        'Equipment over €10,000 net is capex on cost center 0400. I removed "Save the coded invoice". ' +
+        'I removed "Invoices for the Czech subsidiary always need a second approval.".',
+    );
+  });
+
+  it('skips a guardrail update that cites a turn outside the correction', async () => {
+    const { workmap, input } = await sabine();
+    const { changes, warnings } = applyMapPatch({
+      workmap,
+      turns: correction,
+      events: input.events,
+      expert: 'Sabine',
+      patch: {
+        ...none,
+        update_guardrails: [
+          { guardrail_key: 'G1', description: 'x', rule_json: null, consequence: null, quote: 'x', quote_en: 'x', turn_id: 'tt-04' },
+        ],
+      },
+    });
+    expect(changes).toEqual([]);
+    expect(warnings).toEqual(['update G1: tt-04 is not an expert turn of this exchange']);
   });
 });
 
@@ -114,6 +189,16 @@ describe('parsePatch', () => {
     };
     expect(parsePatch(JSON.stringify(patch))).toEqual({ ok: false, problem: 'New guardrail 1 has a rule_json that is not a JSON object.' });
     expect(parsePatch(JSON.stringify(none))).toEqual({ ok: true, value: none });
+  });
+
+  it('rejects a corrected rule that is not a JSON-Logic object, and accepts null for "keep it"', () => {
+    const base = { ...none, update_steps: [], remove_steps: [], remove_guardrails: [], restatement: 'Korrigiert.' };
+    const update = { guardrail_key: 'G1', description: 'x', rule_json: '[1]', consequence: null, quote: 'x', quote_en: 'x', turn_id: 't' };
+    expect(parseCorrection(JSON.stringify({ ...base, update_guardrails: [update] }))).toEqual({
+      ok: false,
+      problem: 'The update to G1 has a rule_json that is not a JSON object.',
+    });
+    expect(parseCorrection(JSON.stringify({ ...base, update_guardrails: [{ ...update, rule_json: null }] })).ok).toBe(true);
   });
 });
 
