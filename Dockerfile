@@ -1,5 +1,7 @@
 FROM node:22-slim AS build
 WORKDIR /app
+# git: pnpm fetches @sidekik/contracts from GitHub.
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@10.34.6 --activate
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
