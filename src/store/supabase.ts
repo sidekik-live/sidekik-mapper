@@ -99,6 +99,11 @@ export function supabaseStore(db: SupabaseClient): Store {
       return unwrap<OpenItemRow[]>(res, 'load carried-over open items');
     },
 
+    async getWorkMap(id) {
+      const res = await db.from('work_maps').select(WORK_MAP_COLUMNS).eq('id', id).maybeSingle();
+      return unwrap<WorkMapRow | null>(res, 'load work map');
+    },
+
     async findWorkMapBySession(sessionId) {
       const res = await db
         .from('work_maps')
@@ -160,6 +165,12 @@ export function supabaseStore(db: SupabaseClient): Store {
         .eq('workflow_id', workflowId)
         .maybeSingle();
       return unwrap<ExpertMemoryRow | null>(res, 'load expert memory');
+    },
+
+    async replaceKbChunks(workMapId, rows) {
+      // Not atomic: a failure between the two leaves the map unsearchable until publish runs again.
+      unwrap(await db.from('kb_chunks').delete().eq('work_map_id', workMapId), 'delete kb chunks');
+      if (rows.length > 0) unwrap(await db.from('kb_chunks').insert(rows), 'insert kb chunks');
     },
   };
 }

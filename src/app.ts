@@ -11,6 +11,7 @@ import type { Env } from './env.js';
 import { HttpError } from './errors.js';
 import { genReqId, registerRequestLogging } from './logging.js';
 import { healthRoutes, type HealthCheck } from './routes/health.js';
+import { internalRoutes, type InternalRoutesOptions } from './routes/internal.js';
 import { startConsumers, type Handlers } from './services/consumers.js';
 import { JobRunner } from './services/jobs.js';
 import { VERSION } from './version.js';
@@ -20,6 +21,8 @@ export type AppDeps = {
   /** Closed by the app on shutdown. */
   bus: Bus;
   handlers: Handlers;
+  store: InternalRoutesOptions['store'];
+  publish: InternalRoutesOptions['publish'];
   healthChecks: Record<string, HealthCheck>;
   /** Defaults to a runner logging through the app's logger. */
   jobs?: JobRunner;
@@ -88,6 +91,7 @@ export async function buildApp(deps: AppDeps) {
   });
 
   await app.register(healthRoutes, { version: VERSION, checks: deps.healthChecks });
+  await app.register(internalRoutes, { store: deps.store, jobs, publish: deps.publish });
 
   return app;
 }

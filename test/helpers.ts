@@ -11,6 +11,7 @@ import {
 } from '../src/contracts/index.js';
 import { loadEnv, type Env } from '../src/env.js';
 import type { Handlers } from '../src/services/consumers.js';
+import { memoryStore } from '../src/store/memory.js';
 
 export const SECRETS = { internal: 'i'.repeat(64) };
 
@@ -127,6 +128,8 @@ export function buildTestApp(overrides: Partial<AppDeps> = {}) {
     env: testEnv(),
     bus: fakeBus(),
     handlers: recordingHandlers().handlers,
+    store: memoryStore(),
+    publish: async () => {},
     healthChecks: {},
     logger: false,
     ...overrides,
