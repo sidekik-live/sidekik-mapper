@@ -168,6 +168,24 @@ export function supabaseStore(db: SupabaseClient): Store {
       return unwrap<ExpertMemoryRow | null>(res, 'load expert memory');
     },
 
+    async replaceWorkMapRows(workMapId, rows) {
+      // Not atomic. Evidence goes first (it references steps and guardrails); removed steps and
+      // guardrails are deleted before the upsert so a reused key can't hit unique (work_map_id, key).
+      unwrap(await db.from('step_evidence').delete().eq('work_map_id', workMapId), 'delete step evidence');
+      for (const [table, keep] of [
+        ['guardrails', rows.guardrails.map((g) => g.id)],
+        ['work_map_steps', rows.steps.map((s) => s.id)],
+      ] as const) {
+        let removed = db.from(table).delete().eq('work_map_id', workMapId);
+        if (keep.length > 0) removed = removed.not('id', 'in', `(${keep.join(',')})`);
+        unwrap(await removed, `delete removed ${table}`);
+      }
+      // Upserts only send the columns below, so voice's work_map_steps.el_procedure_id survives.
+      if (rows.steps.length > 0) unwrap(await db.from('work_map_steps').upsert(rows.steps), 'upsert work map steps');
+      if (rows.guardrails.length > 0) unwrap(await db.from('guardrails').upsert(rows.guardrails), 'upsert guardrails');
+      if (rows.evidence.length > 0) unwrap(await db.from('step_evidence').insert(rows.evidence), 'insert step evidence');
+    },
+
     async replaceKbChunks(workMapId, rows) {
       // Not atomic: a failure between the two leaves the map unsearchable until publish runs again.
       unwrap(await db.from('kb_chunks').delete().eq('work_map_id', workMapId), 'delete kb chunks');

@@ -109,6 +109,55 @@ export type KbChunkRow = {
   content: string;
 };
 
+/** `work_map_steps` (minus `el_procedure_id`, which voice writes). */
+export type WorkMapStepRow = {
+  id: string;
+  org_id: string;
+  work_map_id: string;
+  key: string;
+  ordinal: number;
+  title: string;
+  decision: string;
+  reason_quote: string | null;
+  reason_quote_en: string | null;
+  reason_turn_id: string | null;
+  source_label: string | null;
+  is_judgment_call: boolean;
+  screen_moment: unknown;
+  screen_signature: unknown;
+};
+
+/** `guardrails`. */
+export type WorkMapGuardrailRow = {
+  id: string;
+  org_id: string;
+  work_map_id: string;
+  key: string;
+  kind: string;
+  description: string;
+  rule_jsonlogic: unknown;
+  consequence: unknown;
+  quote: string;
+  quote_en: string | null;
+};
+
+/** `step_evidence` (the database assigns `id`). */
+export type StepEvidenceRow = {
+  org_id: string;
+  work_map_id: string;
+  step_id: string | null;
+  guardrail_id: string | null;
+  screen_event_id: string | null;
+  keyframe_id: string | null;
+  clip_id: string | null;
+  transcript_turn_id: string;
+  t_ms: number;
+  quote: string | null;
+  source_label: string | null;
+};
+
+export type WorkMapRows = { steps: WorkMapStepRow[]; guardrails: WorkMapGuardrailRow[]; evidence: StepEvidenceRow[] };
+
 /** A `search_kb()` hit (SCHEMA.md 0005): full-text rank, or trigram similarity as the fallback. */
 export type KbHit = { id: string; kind: KbChunkRow['kind']; ref_id: string | null; content: string; score: number };
 
@@ -151,6 +200,12 @@ export interface Store {
   /** Replaces every open item of the Work Map with `rows`. */
   replaceOpenItems(workMapId: string, rows: OpenItemRow[]): Promise<void>;
   getExpertMemory(expertId: string, workflowId: string): Promise<ExpertMemoryRow | null>;
+  /**
+   * Makes the Work Map's `work_map_steps`, `guardrails` and `step_evidence` match `rows`: removed
+   * steps and guardrails are deleted, the rest upserted by id (keeping columns other services
+   * write), and the evidence replaced.
+   */
+  replaceWorkMapRows(workMapId: string, rows: WorkMapRows): Promise<void>;
   /** Replaces every search chunk of the Work Map with `rows`. */
   replaceKbChunks(workMapId: string, rows: KbChunkRow[]): Promise<void>;
   /** The workflow's best search chunks for a query (`search_kb()`), best first. */

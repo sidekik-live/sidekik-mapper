@@ -33,12 +33,22 @@ async function confirmedSabine(perception?: PerceptionClient) {
     if (stream === STREAMS.workmapPublished) order.push(`event (row ${store.data.work_maps[0]!.status})`);
     return publishEvent(stream, ev);
   };
+  const replaceRows = store.replaceWorkMapRows.bind(store);
+  store.replaceWorkMapRows = async (id, rows) => {
+    order.push('rows');
+    return replaceRows(id, rows);
+  };
   const clips: { sessionId: string; items: ClipRequest[] }[] = [];
   const publish = createPublishJob({
     store,
     bus,
     artifacts,
-    perception: perception ?? stubPerception((sessionId, items) => clips.push({ sessionId, items })),
+    perception:
+      perception ??
+      stubPerception((sessionId, items) => {
+        order.push('clips');
+        clips.push({ sessionId, items });
+      }),
   });
   return { store, bus, row, artifacts, clips, order, publish };
 }
@@ -51,7 +61,7 @@ describe('publish job', () => {
     const dir = `org/${SABINE.org}/${s.row.id}/v1`;
     expect(outcome.paths).toEqual([`${dir}/workmap.json`, `${dir}/AGENT_RULES.md`, `${dir}/guardrails.jsonlogic.json`]);
     expect([...s.artifacts.files.keys()]).toEqual(outcome.paths);
-    expect(s.order).toEqual(['put workmap.json', 'put AGENT_RULES.md', 'put guardrails.jsonlogic.json', 'event (row published)']);
+    expect(s.order).toEqual(['rows', 'clips', 'put workmap.json', 'put AGENT_RULES.md', 'put guardrails.jsonlogic.json', 'event (row published)']);
 
     const stored = WorkMapSchema.parse(JSON.parse(s.artifacts.files.get(`${dir}/workmap.json`)!.body));
     expect(stored).toMatchObject({ id: s.row.id, status: 'published', confirmed_turn_id: 'db-9' });
@@ -69,6 +79,20 @@ describe('publish job', () => {
       session_id: SABINE.session,
       data: { workmap_id: s.row.id, workflow_id: SABINE.workflow, version: 1 },
     });
+  });
+
+  it('writes the normalized rows the Work Map page and the clips reference', async () => {
+    const s = await confirmedSabine();
+    await s.publish(s.row.id, silentLog());
+    expect(s.store.data.work_map_steps.map((r) => r.id)).toEqual(s.row.json.steps.map((x) => x.id));
+    expect(s.store.data.guardrails.map((r) => r.key)).toEqual(['G1', 'G2', 'G4', 'G5']);
+    expect(s.store.data.step_evidence).toHaveLength(11);
+
+    // A republish after a step was removed leaves no stale rows.
+    s.store.data.work_maps[0]!.json.steps.pop();
+    await s.publish(s.row.id, silentLog());
+    expect(s.store.data.work_map_steps).toHaveLength(5);
+    expect(s.store.data.step_evidence.every((e) => !e.step_id || s.store.data.work_map_steps.some((st) => st.id === e.step_id))).toBe(true);
   });
 
   it('requests one clip per step around its screen moment', async () => {
