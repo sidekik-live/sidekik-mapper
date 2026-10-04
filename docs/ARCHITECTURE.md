@@ -1,4 +1,4 @@
-# Sidekik: System Architecture (v0.3.5)
+# Sidekik: System Architecture (v0.3.6)
 
 > **Sidekik** is an AI apprentice. It watches an expert work on their screen and asks why at the right moments. It turns that session into a Work Map, then coaches the next hire through the same work on their own screen.
 > Hack-Nation 7th Global AI Hackathon, Challenge 01 (ElevenLabs) · Domain: **sidekik.live** (Cloudflare) · Team: **Sahil, Aadil, Mayukh**
@@ -419,7 +419,7 @@ sequenceDiagram
   - `GET /healthz` returns `{ok, version, deps}`.
 - **Repo setup:**
   - `.env.example` lists every variable; `src/env.ts` validates them with zod at boot.
-  - `@sidekik/contracts` is pinned to a git tag: `"@sidekik/contracts": "github:sidekik-live/sidekik-platform#v0.3.1"` (the latest tag).
+  - `@sidekik/contracts` is pinned to a git tag: `"@sidekik/contracts": "github:sidekik-live/sidekik-platform#v0.3.2"` (the latest tag).
   - Release tags carry a prebuilt `dist/`, so installing runs no build step. pnpm 10 blocks build scripts in git dependencies, which is why the build is prebuilt. Pin tags only; branches have no `dist/`.
   - **Use pnpm 10** (`"packageManager": "pnpm@10.34.6"`). pnpm 9 installs the git dependency under a directory name containing `#`, which Vite (and so vitest) can't load. A lockfile written by pnpm 9 also pins the tag object instead of the commit; pnpm 10 resolves the tag to its commit.
   - If the platform repo is private, add a read-only `NPM_GITHUB_TOKEN` to Railway build variables.
