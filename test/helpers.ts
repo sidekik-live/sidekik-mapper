@@ -130,6 +130,7 @@ export function buildTestApp(overrides: Partial<AppDeps> = {}) {
     handlers: recordingHandlers().handlers,
     store: memoryStore(),
     publish: async () => {},
+    comparator: { differences: async () => [] },
     healthChecks: {},
     logger: false,
     ...overrides,

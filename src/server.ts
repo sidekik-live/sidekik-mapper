@@ -3,6 +3,7 @@ import { claudeDrafter } from './build/drafter.js';
 import { httpDecider } from './clients/brain.js';
 import { httpGateway } from './clients/gateway.js';
 import { httpPerception } from './clients/perception.js';
+import { claudeComparator } from './compare/compare.js';
 import { createBus } from './contracts/index.js';
 import { loadEnv } from './env.js';
 import { claudeAnswerPatcher, claudeCorrectionPatcher } from './debrief/patch.js';
@@ -38,6 +39,7 @@ app = await buildApp({
     teachback: claudeTeachbackWriter({ apiKey: env.ANTHROPIC_API_KEY, model: env.PATCH_MODEL }),
   }),
   store,
+  comparator: claudeComparator({ apiKey: env.ANTHROPIC_API_KEY, model: env.PATCH_MODEL }),
   publish: createPublishJob({
     store,
     bus,
