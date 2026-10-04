@@ -1,4 +1,4 @@
-# Sidekik: System Architecture (v0.3)
+# Sidekik: System Architecture (v0.3.5)
 
 > **Sidekik** is an AI apprentice. It watches an expert work on their screen and asks why at the right moments. It turns that session into a Work Map, then coaches the next hire through the same work on their own screen.
 > Hack-Nation 7th Global AI Hackathon, Challenge 01 (ElevenLabs) · Domain: **sidekik.live** (Cloudflare) · Team: **Sahil, Aadil, Mayukh**
@@ -139,7 +139,7 @@ Nine repos for three people in 24 hours means integration is the main risk, more
 | `sk:speech.signals` | gateway, meetbot | brain, tutor | `SpeechSignal` |
 | `sk:dom.events` | gateway | perception | `DomEvent` |
 | `sk:screen.events` | perception | brain, tutor, mapper, gateway (replay) | `ScreenEvent` |
-| `sk:agent.commands` | perception (`ctx`), brain (`ask`), mapper (`followup`, `teachback`), tutor (`predict`, `intervene`, `replay`, `summary`) | gateway | `AgentCommand` |
+| `sk:agent.commands` | perception (`ctx`), brain (`ask`), mapper (`followup`, `teachback`), tutor (`predict`, `intervene`, `replay`, `summary`) | gateway; perception (reads `ask` to keep keyframes around each question) | `AgentCommand` |
 | `sk:workmap.published` | mapper | voice, tutor | `WorkMapPublished` |
 | `sk:usage` | every service | gateway (cost ledger) | `UsageRecord` |
 
@@ -219,7 +219,8 @@ type Phase = "capture" | "building" | "debrief" | "confirmed" | "tutoring" | "do
 
 type SessionLifecycle = { event: "started"|"task_done"|"phase_changed"|"offrecord_on"|"offrecord_off"
   |"ended"|"bot_joined"|"bot_left"|"bot_error"; kind: SessionKind; phase: Phase;
-  workflow_id: string; workmap_id?: string; mode: "browser"|"meeting"|"replay"; language: string };
+  workflow_id: string; workmap_id?: string; mode: "browser"|"meeting"|"replay"; language: string;
+  reason?: string };   // bot_error / bot_left: Recall's sub code
 
 type TranscriptTurn = { turn_id: string; role: "user"|"agent"; text: string; lang: string;
   source: "live"|"webhook"; redacted: true };
@@ -342,7 +343,7 @@ Cloudflare settings and caveats:
 | `TYPESAFE_API_KEY` (+ `OPENROUTER_API_KEY` fallback) | | | ✓ | | | | | |
 | `ANTHROPIC_API_KEY` | | ✓ | ✓ | ✓ | | | | |
 | `ELEVENLABS_API_KEY`, `EL_*_AGENT_ID`, `EL_WEBHOOK_SECRET` | | | | | | ✓ | | |
-| `RECALL_API_KEY`, `RECALL_REGION`, `RECALL_WS_SECRET` | | | | | | | ✓ | |
+| `RECALL_API_KEY`, `RECALL_REGION`, `RECALL_WS_SECRET`, `RECALL_WEBHOOK_SECRET` | | | | | | | ✓ | |
 | `PRESIDIO_*_URL` | ✓ | ✓ | | | | | | |
 
 Store secrets only in the Railway (or Fly) environment, one shared variable group per environment. **Never put secrets in the Lovable repo**: it only gets the anon key and public URLs.
@@ -418,7 +419,7 @@ sequenceDiagram
   - `GET /healthz` returns `{ok, version, deps}`.
 - **Repo setup:**
   - `.env.example` lists every variable; `src/env.ts` validates them with zod at boot.
-  - `@sidekik/contracts` is pinned to a git tag: `"@sidekik/contracts": "github:sidekik-live/sidekik-platform#v0.1.0"`.
+  - `@sidekik/contracts` is pinned to a git tag: `"@sidekik/contracts": "github:sidekik-live/sidekik-platform#v0.3.1"` (the latest tag).
   - Release tags carry a prebuilt `dist/`, so installing runs no build step. pnpm 10 blocks build scripts in git dependencies, which is why the build is prebuilt. Pin tags only; branches have no `dist/`.
   - **Use pnpm 10** (`"packageManager": "pnpm@10.34.6"`). pnpm 9 installs the git dependency under a directory name containing `#`, which Vite (and so vitest) can't load. A lockfile written by pnpm 9 also pins the tag object instead of the commit; pnpm 10 resolves the tag to its commit.
   - If the platform repo is private, add a read-only `NPM_GITHUB_TOKEN` to Railway build variables.
