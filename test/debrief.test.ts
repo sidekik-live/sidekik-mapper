@@ -45,6 +45,7 @@ const patcher = (): AnswerPatcher & { calls: string[] } => {
 };
 
 async function setup(opts: { decider?: Decider; patcher?: AnswerPatcher; corrector?: CorrectionPatcher } = {}) {
+  const confirmed: { id: string; org_id: string; session_id: string }[] = [];
   const store = memoryStore(sabineCapture());
   const bus = fakeBus();
   const phases: PhaseRequest[] = [];
@@ -61,6 +62,7 @@ async function setup(opts: { decider?: Decider; patcher?: AnswerPatcher; correct
     patcher: p,
     corrector: opts.corrector ?? noopCorrector,
     teachback: { write: async () => 'SCRIPT' },
+    onConfirmed: (w) => confirmed.push(w),
   });
 
   let t = 200_000;
@@ -89,7 +91,7 @@ async function setup(opts: { decider?: Decider; patcher?: AnswerPatcher; correct
     await turn('user', text);
     await vi.advanceTimersByTimeAsync(2_000);
   };
-  return { store, bus, driver, phases, patcher: p, turn, commands, start, map, items, answer };
+  return { store, bus, driver, phases, patcher: p, turn, commands, start, map, items, answer, confirmed };
 }
 
 beforeEach(() => vi.useFakeTimers());
@@ -131,6 +133,8 @@ describe('debrief driver', () => {
     expect(s.store.data.guardrails.map((g) => g.key)).toEqual(['G1', 'G2', 'G4', 'G5', 'G6']);
     expect(s.store.data.step_evidence.find((e) => e.guardrail_id === g.id)).toMatchObject({ transcript_turn_id: 'db-3', screen_event_id: 'se-02' });
     expect(s.phases.map((p) => p.phase)).toEqual(['debrief', 'confirmed']);
+    // ARCHITECTURE §8: publishing follows the confirmation.
+    expect(s.confirmed).toEqual([{ id: s.map().id, org_id: SABINE.org, session_id: SABINE.session }]);
     expect(s.items().map((o) => [o.importance, o.status])).toEqual([
       [3, 'resolved'],
       [2, 'resolved'],

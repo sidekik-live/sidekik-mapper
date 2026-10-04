@@ -10,8 +10,11 @@ import { createServiceLogger } from './logger.js';
 import { claudeAnswerPatcher, claudeCorrectionPatcher } from './debrief/patch.js';
 import { claudeTeachbackWriter } from './debrief/teachback.js';
 import { createHandlers } from './handlers.js';
+import { publishOnConfirm } from './publish/on-confirm.js';
 import { createPublishJob } from './publish/publish-job.js';
 import { redisHealth } from './redis-health.js';
+import { CaptureBuffer } from './services/capture-buffer.js';
+import { JobRunner } from './services/jobs.js';
 import { supabaseArtifacts } from './store/artifacts.js';
 import { supabaseStore } from './store/supabase.js';
 import { createSupabase, supabaseHealth } from './supabase.js';
@@ -23,10 +26,22 @@ const log = createServiceLogger(env.LOG_LEVEL);
 const bus = createBus(env.REDIS_URL, 'mapper', { logger: log.child({ component: 'bus' }) });
 const redis = redisHealth(env.REDIS_URL, log);
 
+const capture = new CaptureBuffer();
+const jobs = new JobRunner({ log: log.child({ component: 'jobs' }) });
+const publish = createPublishJob({
+  store,
+  bus,
+  capture,
+  perception: httpPerception(env.PERCEPTION_URL, env.SK_INTERNAL_TOKEN),
+  artifacts: supabaseArtifacts(supabase),
+});
+
 const app = await buildApp({
   env,
   bus,
   handlers: createHandlers({
+    capture,
+    onConfirmed: publishOnConfirm(jobs, publish),
     store,
     drafter: claudeDrafter({ apiKey: env.ANTHROPIC_API_KEY, model: env.BUILDER_MODEL }),
     bus,
@@ -38,12 +53,8 @@ const app = await buildApp({
   }),
   store,
   comparator: claudeComparator({ apiKey: env.ANTHROPIC_API_KEY, model: env.PATCH_MODEL }),
-  publish: createPublishJob({
-    store,
-    bus,
-    perception: httpPerception(env.PERCEPTION_URL, env.SK_INTERNAL_TOKEN),
-    artifacts: supabaseArtifacts(supabase),
-  }),
+  publish,
+  jobs,
   healthChecks: {
     supabase: supabaseHealth(supabase),
     redis: redis.check,

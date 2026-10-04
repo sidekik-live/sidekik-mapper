@@ -1,5 +1,5 @@
 import type { FastifyBaseLogger } from 'fastify';
-import { STREAMS, type Bus, type Envelope, type SessionLifecycle, type TranscriptTurn } from '../contracts/index.js';
+import { STREAMS, type Bus, type Envelope, type SessionLifecycle, type TranscriptTurn, type ScreenEvent } from '../contracts/index.js';
 import type { JobRunner } from './jobs.js';
 import { RecentIds } from './recent-ids.js';
 
@@ -11,6 +11,8 @@ export type Handlers = {
   debrief(ev: Envelope<SessionLifecycle>, log: FastifyBaseLogger): Promise<void>;
   /** Every transcript turn of a non-replay session; the debrief driver picks the ones it waits for. */
   turn(ev: Envelope<TranscriptTurn>, log: FastifyBaseLogger): Promise<void>;
+  /** Every screen event of a non-replay session (kept for the build, ARCHITECTURE §4.2). */
+  screen(ev: Envelope<ScreenEvent>, log: FastifyBaseLogger): Promise<void>;
   /** Capture session `ended`: finalize expert memory. */
   ended(ev: Envelope<SessionLifecycle>, log: FastifyBaseLogger): Promise<void>;
 };
@@ -67,9 +69,17 @@ export function startConsumers(deps: ConsumerDeps): () => void {
     seenTurns.add(ev.id);
   };
 
+  const seenScreen = new RecentIds();
+  const onScreen = async (ev: Envelope<ScreenEvent>) => {
+    if (seenScreen.has(ev.id) || replays.has(ev.session_id)) return;
+    await deps.handlers.screen(ev, eventLog(ev));
+    seenScreen.add(ev.id);
+  };
+
   const stops = [
     deps.bus.consume(STREAMS.lifecycle, onLifecycle),
     deps.bus.consume(STREAMS.turns, onTurn),
+    deps.bus.consume(STREAMS.screen, onScreen),
   ];
   return () => {
     for (const stop of stops) stop();

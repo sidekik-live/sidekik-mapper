@@ -15,7 +15,13 @@ export function createHandlers(deps: MapperDeps): Handlers & { driver: DebriefDr
       await build(ev, log);
     },
     debrief: (ev, log) => driver.start(ev, log),
-    turn: (ev, log) => driver.onTurn(ev, log),
+    turn: async (ev, log) => {
+      deps.capture?.addTurn(ev);
+      await driver.onTurn(ev, log);
+    },
+    screen: async (ev) => {
+      deps.capture?.addScreen(ev);
+    },
     // DESIGN §2: a capture session's end finalizes the expert's memory, from its map if it has one.
     ended: async (ev, log) => {
       driver.end(ev.session_id);
