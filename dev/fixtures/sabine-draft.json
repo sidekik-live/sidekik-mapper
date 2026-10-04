@@ -1,0 +1,280 @@
+{
+ "title": "Supplier invoice coding",
+ "steps": [
+  {
+   "key": "S1",
+   "title": "Open the invoice and check the supplier",
+   "screen_moment": {
+    "label": "Invoice opened from the inbox",
+    "event_ids": [
+     "se-02",
+     "se-08",
+     "se-12"
+    ],
+    "entity": "invoice #4471",
+    "field": null
+   },
+   "decision": "Checked the supplier is on the supplier list",
+   "reason": {
+    "quote": "Den Lieferanten kenne ich, der ist in der Lieferantenliste.",
+    "quote_en": "I know this supplier, it's on the supplier list.",
+    "turn_id": "tt-02"
+   },
+   "guardrail_keys": [],
+   "is_judgment_call": false,
+   "screen_signature": {
+    "app": "MiniERP",
+    "record_kind": "invoice",
+    "field": null
+   }
+  },
+  {
+   "key": "S2",
+   "title": "Code equipment over €5,000 as capex",
+   "screen_moment": {
+    "label": "Cost center changed 4711 → 0400",
+    "event_ids": [
+     "se-04"
+    ],
+    "entity": "invoice #4471",
+    "field": "cost_center"
+   },
+   "decision": "Re-coded opex (4711) to capex (0400)",
+   "reason": {
+    "quote": "Das ist eine Maschine über 5.000 Euro, das ist Anlagevermögen.",
+    "quote_en": "This is a machine over €5,000, that's a fixed asset.",
+    "turn_id": "tt-03"
+   },
+   "guardrail_keys": [
+    "G1"
+   ],
+   "is_judgment_call": true,
+   "screen_signature": {
+    "app": "MiniERP",
+    "record_kind": "invoice",
+    "field": "cost_center"
+   }
+  },
+  {
+   "key": "S3",
+   "title": "Add the asset number to capex invoices",
+   "screen_moment": {
+    "label": "Asset number AN-2291 entered",
+    "event_ids": [
+     "se-05"
+    ],
+    "entity": "invoice #4471",
+    "field": "asset_number"
+   },
+   "decision": "Entered asset number AN-2291 before saving",
+   "reason": {
+    "quote": "Und ohne Anlagennummer darf ich nicht auf 0400 buchen, das lehnt die Buchhaltung ab.",
+    "quote_en": "And without an asset number I can't book to 0400, accounting rejects it.",
+    "turn_id": "tt-05"
+   },
+   "guardrail_keys": [
+    "G2"
+   ],
+   "is_judgment_call": false,
+   "screen_signature": {
+    "app": "MiniERP",
+    "record_kind": "invoice",
+    "field": "asset_number"
+   }
+  },
+  {
+   "key": "S4",
+   "title": "Hold December invoices from Kranbau",
+   "screen_moment": {
+    "label": "Payment status set to on hold",
+    "event_ids": [
+     "se-10"
+    ],
+    "entity": "invoice #4480",
+    "field": "payment_status"
+   },
+   "decision": "Put the Kranbau December invoice on hold to check for duplicates",
+   "reason": {
+    "quote": "Seitdem halte ich jede Dezemberrechnung von denen an und prüfe erst auf Duplikate.",
+    "quote_en": "Since then I hold every December invoice from them and check for duplicates first.",
+    "turn_id": "tt-07"
+   },
+   "guardrail_keys": [
+    "G4"
+   ],
+   "is_judgment_call": true,
+   "screen_signature": {
+    "app": "MiniERP",
+    "record_kind": "invoice",
+    "field": "payment_status"
+   }
+  },
+  {
+   "key": "S5",
+   "title": "Request a second approval for CZ01",
+   "screen_moment": {
+    "label": "Second approval requested",
+    "event_ids": [
+     "se-13"
+    ],
+    "entity": "invoice #4492",
+    "field": null
+   },
+   "decision": "Requested a second approval for the Czech subsidiary",
+   "reason": {
+    "quote": "Ja, bei CZ01 brauchen wir immer eine zweite Freigabe, egal wie hoch der Betrag ist.",
+    "quote_en": "Yes, CZ01 always needs a second approval, whatever the amount.",
+    "turn_id": "tt-09"
+   },
+   "guardrail_keys": [
+    "G5"
+   ],
+   "is_judgment_call": true,
+   "screen_signature": {
+    "app": "MiniERP",
+    "record_kind": "invoice",
+    "field": null
+   }
+  },
+  {
+   "key": "S6",
+   "title": "Save the coded invoice",
+   "screen_moment": {
+    "label": "Invoice saved",
+    "event_ids": [
+     "se-06",
+     "se-11",
+     "se-15"
+    ],
+    "entity": "invoice #4471",
+    "field": null
+   },
+   "decision": "Saved the invoice once coding was complete",
+   "reason": null,
+   "guardrail_keys": [],
+   "is_judgment_call": false,
+   "screen_signature": {
+    "app": "MiniERP",
+    "record_kind": "invoice",
+    "field": null
+   }
+  }
+ ],
+ "guardrails": [
+  {
+   "key": "G1",
+   "kind": "threshold",
+   "description": "Equipment over €5,000 net is always capex on cost center 0400.",
+   "rule_json": "{\"and\": [{\">\": [{\"var\": \"net_amount\"}, 5000]}, {\"==\": [{\"var\": \"category\"}, \"equipment\"]}, {\"!=\": [{\"var\": \"cost_center\"}, \"0400\"]}]}",
+   "consequence": {
+    "require": [
+     {
+      "field": "cost_center",
+      "value": "0400"
+     }
+    ],
+    "block": false,
+    "action": null
+   },
+   "quote": "Alles, was Ausrüstung ist und über 5.000 Euro netto kostet, ist Capex.",
+   "quote_en": "Anything that is equipment and costs over €5,000 net is capex.",
+   "evidence": [
+    {
+     "event_id": "se-04",
+     "turn_id": "tt-04"
+    }
+   ]
+  },
+  {
+   "key": "G2",
+   "kind": "condition",
+   "description": "No asset number, no booking on capex cost center 0400.",
+   "rule_json": "{\"and\": [{\"==\": [{\"var\": \"cost_center\"}, \"0400\"]}, {\"!\": {\"var\": \"asset_number\"}}]}",
+   "consequence": {
+    "require": [],
+    "block": true,
+    "action": null
+   },
+   "quote": "Und ohne Anlagennummer darf ich nicht auf 0400 buchen, das lehnt die Buchhaltung ab.",
+   "quote_en": "And without an asset number I can't book to 0400, accounting rejects it.",
+   "evidence": [
+    {
+     "event_id": "se-05",
+     "turn_id": "tt-05"
+    }
+   ]
+  },
+  {
+   "key": "G4",
+   "kind": "hold",
+   "description": "Hold every December invoice from Kranbau GmbH and check for duplicates.",
+   "rule_json": "{\"and\": [{\"in\": [{\"var\": \"supplier\"}, [\"Kranbau GmbH\"]]}, {\"==\": [{\"var\": \"invoice_month\"}, 12]}]}",
+   "consequence": {
+    "require": [],
+    "block": false,
+    "action": "hold"
+   },
+   "quote": "Seitdem halte ich jede Dezemberrechnung von denen an und prüfe erst auf Duplikate.",
+   "quote_en": "Since then I hold every December invoice from them and check for duplicates first.",
+   "evidence": [
+    {
+     "event_id": "se-10",
+     "turn_id": "tt-07"
+    }
+   ]
+  },
+  {
+   "key": "G5",
+   "kind": "second_approval",
+   "description": "Invoices for the Czech subsidiary always need a second approval.",
+   "rule_json": "{\"and\": [{\"in\": [\"CZ\", {\"var\": \"company_code\"}]}, {\"<\": [{\"var\": \"approvals_count\"}, 2]}]}",
+   "consequence": {
+    "require": [],
+    "block": false,
+    "action": "second_approval"
+   },
+   "quote": "Ja, bei CZ01 brauchen wir immer eine zweite Freigabe, egal wie hoch der Betrag ist.",
+   "quote_en": "Yes, CZ01 always needs a second approval, whatever the amount.",
+   "evidence": [
+    {
+     "event_id": "se-13",
+     "turn_id": "tt-09"
+    }
+   ]
+  }
+ ],
+ "open_items": [
+  {
+   "text": "Before booking an invoice from a supplier you don't know, do you always ask the controller first, and how do you tell the supplier is unknown?",
+   "importance": "high",
+   "anchor_event_id": null,
+   "anchor_turn_id": "tt-10",
+   "source": "builder",
+   "source_ref": null
+  },
+  {
+   "text": "What do you do when the asset number hasn't been assigned yet?",
+   "importance": "medium",
+   "anchor_event_id": "se-05",
+   "anchor_turn_id": null,
+   "source": "unasked_question",
+   "source_ref": "q-04"
+  },
+  {
+   "text": "From what amount does a DE01 invoice need a second approval?",
+   "importance": "medium",
+   "anchor_event_id": null,
+   "anchor_turn_id": null,
+   "source": "carried_over",
+   "source_ref": "00000000-0000-4000-8000-0000000001a1"
+  },
+  {
+   "text": "Who is the controller you ask about unknown suppliers?",
+   "importance": "low",
+   "anchor_event_id": null,
+   "anchor_turn_id": "tt-10",
+   "source": "unasked_question",
+   "source_ref": "q-05"
+  }
+ ]
+}

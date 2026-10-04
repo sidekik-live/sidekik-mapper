@@ -7,3 +7,4 @@ export * from './transcript.js';
 export * from './screen.js';
 export * from './commands.js';
 export * from './usage.js';
+export * from './workmap.js';

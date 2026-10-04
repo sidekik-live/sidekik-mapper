@@ -1,7 +1,9 @@
 import { buildApp } from './app.js';
+import { claudeDrafter } from './build/drafter.js';
 import { createBus } from './contracts/index.js';
 import { loadEnv } from './env.js';
-import { pendingHandlers } from './handlers.js';
+import { createHandlers } from './handlers.js';
+import { supabaseStore } from './store/supabase.js';
 import { createSupabase, supabaseHealth } from './supabase.js';
 
 const env = loadEnv();
@@ -17,7 +19,11 @@ const bus = createBus(env.REDIS_URL, 'mapper', {
 app = await buildApp({
   env,
   bus,
-  handlers: pendingHandlers,
+  handlers: createHandlers({
+    store: supabaseStore(supabase),
+    drafter: claudeDrafter({ apiKey: env.ANTHROPIC_API_KEY, model: env.BUILDER_MODEL }),
+    bus,
+  }),
   healthChecks: {
     supabase: supabaseHealth(supabase),
     redis: async () => {

@@ -14,4 +14,6 @@ Assumptions shared with the gateway (confirm with Sahil):
 - Envelope `type` values: `"session.lifecycle"`, `"transcript.turn"`, `"agent.command"`.
 - Replays publish under a new session id, and every lifecycle event of a replay carries `mode: "replay"`.
 
-Still missing, and needed by later tickets: `ScreenEvent`/`ScreenState`, `WorkMap`/`Step`/`Guardrail`/`Evidence`/`OpenItem` (Appendix B), `DecisionRequest`/`DecisionResult`, `WorkMapPublished`.
+Added here beyond the gateway's copy (additive, from ARCHITECTURE §5 and Appendix B): `ScreenEvent`/`ScreenState` in `screen.ts`, and `workmap.ts` (`WorkMap`, `Step`, `Guardrail`, `Evidence`, `OpenItem`, `WorkMapPublished`, the allowed rule variables).
+
+Still missing, and needed by later tickets: `DecisionRequest`/`DecisionResult`.
