@@ -30,7 +30,7 @@ export type MemoryData = {
   answers: AnswerRow[];
   open_items: OpenItemRow[];
   work_maps: WorkMapRow[];
-  expert_memory: ExpertMemoryRow[];
+  expert_memory: (ExpertMemoryRow & { org_id?: string; updated_at?: string })[];
   kb_chunks: KbChunkRow[];
   work_map_steps: WorkMapStepRow[];
   guardrails: WorkMapGuardrailRow[];
@@ -84,7 +84,9 @@ export function memoryStore(seed: Partial<MemoryData> = {}): Store & { data: Mem
     async listCarriedOverOpenItems(workflowId, expertId, excludeSessionId) {
       const earlier = new Set(
         data.sessions
-          .filter((s) => s.workflow_id === workflowId && s.expert_id === expertId && s.kind === 'capture' && s.id !== excludeSessionId)
+          .filter(
+            (s) => s.workflow_id === workflowId && s.expert_id === expertId && s.kind === 'capture' && s.id !== excludeSessionId,
+          )
           .map((s) => s.id),
       );
       return data.open_items
@@ -125,6 +127,10 @@ export function memoryStore(seed: Partial<MemoryData> = {}): Store & { data: Mem
     },
     async getExpertMemory(expertId, workflowId) {
       return data.expert_memory.find((m) => m.expert_id === expertId && m.workflow_id === workflowId) ?? null;
+    },
+    async upsertExpertMemory(row) {
+      const others = data.expert_memory.filter((m) => !(m.expert_id === row.expert_id && m.workflow_id === row.workflow_id));
+      data.expert_memory = [...others, { ...structuredClone(row), updated_at: new Date().toISOString() }];
     },
     // Word overlap stands in for Postgres full-text search here.
     async searchKb(orgId, workflowId, query, limit) {

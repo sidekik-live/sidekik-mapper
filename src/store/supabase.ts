@@ -79,16 +79,9 @@ export function supabaseStore(db: SupabaseClient): Store {
     },
 
     async listCarriedOverOpenItems(workflowId, expertId, excludeSessionId) {
-      const sessions = unwrap<{ id: string }[]>(
-        await db
-          .from('sessions')
-          .select('id')
-          .eq('workflow_id', workflowId)
-          .eq('expert_id', expertId)
-          .eq('kind', 'capture')
-          .neq('id', excludeSessionId),
-        'load earlier sessions',
-      );
+      let query = db.from('sessions').select('id').eq('workflow_id', workflowId).eq('expert_id', expertId).eq('kind', 'capture');
+      if (excludeSessionId) query = query.neq('id', excludeSessionId);
+      const sessions = unwrap<{ id: string }[]>(await query, 'load earlier sessions');
       if (sessions.length === 0) return [];
       const res = await db
         .from('open_items')
@@ -161,11 +154,18 @@ export function supabaseStore(db: SupabaseClient): Store {
     async getExpertMemory(expertId, workflowId) {
       const res = await db
         .from('expert_memory')
-        .select('expert_id, workflow_id, summary')
+        .select('expert_id, workflow_id, summary, open_item_ids')
         .eq('expert_id', expertId)
         .eq('workflow_id', workflowId)
         .maybeSingle();
       return unwrap<ExpertMemoryRow | null>(res, 'load expert memory');
+    },
+
+    async upsertExpertMemory(row) {
+      const res = await db
+        .from('expert_memory')
+        .upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: 'expert_id,workflow_id' });
+      unwrap(res, 'upsert expert memory');
     },
 
     async replaceWorkMapRows(workMapId, rows) {

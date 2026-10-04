@@ -2,6 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { PerceptionClient } from '../clients/perception.js';
 import { makeEvent, STREAMS, type Bus, type WorkMap, type WorkMapPublished } from '../contracts/index.js';
 import { runDemoCases, type DemoResult } from '../guardrails/demo-cases.js';
+import { updateExpertMemory } from '../memory/expert-memory.js';
 import { checkRule } from '../guardrails/rules.js';
 import type { ArtifactStore } from '../store/artifacts.js';
 import type { Store, WorkMapRow } from '../store/types.js';
@@ -31,8 +32,8 @@ export const artifactDir = (row: Pick<WorkMapRow, 'org_id' | 'id' | 'version'>) 
 
 /**
  * Publishes a confirmed Work Map (DESIGN §6): checks its rules, writes its normalized rows, requests
- * a clip per step, replaces its search chunks, writes the three Storage files, marks it published and announces it on
- * `sk:workmap.published`. Storage and the row are written before the event, because voice loads
+ * a clip per step, replaces its search chunks, writes the three Storage files, marks it published, announces it on
+ * `sk:workmap.published` and refreshes the expert's memory. Storage and the row are written before the event, because voice loads
  * the map from Storage and tutor from the database when they see it.
  */
 export function createPublishJob(deps: PublishDeps) {
@@ -84,7 +85,7 @@ export function createPublishJob(deps: PublishDeps) {
     ];
     for (const [name, body, contentType] of files) await deps.artifacts.put(`${dir}/${name}`, body, contentType);
 
-    // 6. Published, then announced. (Expert memory comes with its own ticket.)
+    // 6. Published, then announced.
     await deps.store.updateWorkMap(row.id, { status: 'published', json: workmap, published_at: new Date().toISOString() });
     await deps.bus.publish(
       STREAMS.workmapPublished,
@@ -96,6 +97,11 @@ export function createPublishJob(deps: PublishDeps) {
         t_ms: 0,
         data: { workmap_id: row.id, workflow_id: row.workflow_id, version: row.version },
       }),
+    );
+
+    // 7. Expert memory: what the agent knows before the expert's next session. Never fails the publish.
+    await updateExpertMemory(deps.store, { orgId: row.org_id, expertId: row.expert_id, workflowId: row.workflow_id, workmap }, log).catch(
+      (err) => log.warn({ err }, 'expert memory update failed'),
     );
 
     const paths = files.map(([name]) => `${dir}/${name}`);
