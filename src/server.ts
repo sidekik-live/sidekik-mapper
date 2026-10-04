@@ -2,16 +2,20 @@ import { buildApp } from './app.js';
 import { claudeDrafter } from './build/drafter.js';
 import { httpDecider } from './clients/brain.js';
 import { httpGateway } from './clients/gateway.js';
+import { httpPerception } from './clients/perception.js';
 import { createBus } from './contracts/index.js';
 import { loadEnv } from './env.js';
 import { claudeAnswerPatcher, claudeCorrectionPatcher } from './debrief/patch.js';
 import { claudeTeachbackWriter } from './debrief/teachback.js';
 import { createHandlers } from './handlers.js';
+import { createPublishJob } from './publish/publish-job.js';
+import { supabaseArtifacts } from './store/artifacts.js';
 import { supabaseStore } from './store/supabase.js';
 import { createSupabase, supabaseHealth } from './supabase.js';
 
 const env = loadEnv();
 const supabase = createSupabase(env);
+const store = supabaseStore(supabase);
 const pretty = process.env.NODE_ENV !== 'production' && process.stdout.isTTY;
 
 let app: Awaited<ReturnType<typeof buildApp>>;
@@ -24,7 +28,7 @@ app = await buildApp({
   env,
   bus,
   handlers: createHandlers({
-    store: supabaseStore(supabase),
+    store,
     drafter: claudeDrafter({ apiKey: env.ANTHROPIC_API_KEY, model: env.BUILDER_MODEL }),
     bus,
     decider: httpDecider(env.BRAIN_URL, env.SK_INTERNAL_TOKEN),
@@ -32,6 +36,13 @@ app = await buildApp({
     patcher: claudeAnswerPatcher({ apiKey: env.ANTHROPIC_API_KEY, model: env.PATCH_MODEL }),
     corrector: claudeCorrectionPatcher({ apiKey: env.ANTHROPIC_API_KEY, model: env.PATCH_MODEL }),
     teachback: claudeTeachbackWriter({ apiKey: env.ANTHROPIC_API_KEY, model: env.PATCH_MODEL }),
+  }),
+  store,
+  publish: createPublishJob({
+    store,
+    bus,
+    perception: httpPerception(env.PERCEPTION_URL, env.SK_INTERNAL_TOKEN),
+    artifacts: supabaseArtifacts(supabase),
   }),
   healthChecks: {
     supabase: supabaseHealth(supabase),

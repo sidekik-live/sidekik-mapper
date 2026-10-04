@@ -4,19 +4,24 @@
 // it, the draft is dev/fixtures/sabine-draft.json, answers and corrections change nothing and the
 // teach-back is a template.
 // Build with `pnpm dev:replay dev/fixtures/capture_sabine.jsonl`, then run the debrief with
-// `pnpm dev:replay dev/fixtures/debrief_sabine.jsonl` (or debrief_sabine_correction.jsonl).
+// `pnpm dev:replay dev/fixtures/debrief_sabine.jsonl` (or debrief_sabine_correction.jsonl), and
+// publish with `curl -X POST localhost:8083/internal/workmaps/<id>/publish -H 'x-internal-token: …'`
+// (the id is in the "work map confirmed" log line). Published files land in dev/out/.
 // Brain is a stand-in (below); the gateway phase calls are logged instead of sent.
 // A perception stub is added with the ticket that first calls it.
 import { buildApp } from '../app.js';
 import { claudeDrafter } from '../build/drafter.js';
 import { D6_HAS_GAPS, stubDecider, type Decider } from '../clients/brain.js';
 import { stubGateway } from '../clients/gateway.js';
+import { stubPerception } from '../clients/perception.js';
 import { createBus } from '../contracts/index.js';
 import { loadEnv } from '../env.js';
 import { plainYes } from '../debrief/driver.js';
 import { claudeAnswerPatcher, claudeCorrectionPatcher, noopCorrector, noopPatcher } from '../debrief/patch.js';
 import { claudeTeachbackWriter, templateTeachback } from '../debrief/teachback.js';
 import { createHandlers } from '../handlers.js';
+import { createPublishJob } from '../publish/publish-job.js';
+import { fileArtifacts } from '../store/artifacts.js';
 import { memoryStore } from '../store/memory.js';
 import { fixtureDrafter, sabineCapture } from './fixtures.js';
 
@@ -54,6 +59,9 @@ const devDecider: Decider = {
     ),
 };
 
+const store = memoryStore(sabineCapture());
+const OUT = new URL('../../dev/out/', import.meta.url).pathname;
+
 let app: Awaited<ReturnType<typeof buildApp>>;
 const bus = createBus(env.REDIS_URL, 'mapper', {
   warn: (obj, msg) => app.log.warn(obj, msg),
@@ -64,7 +72,7 @@ app = await buildApp({
   env,
   bus,
   handlers: createHandlers({
-    store: memoryStore(sabineCapture()),
+    store,
     drafter: useClaude ? claudeDrafter({ apiKey: env.ANTHROPIC_API_KEY, model: env.BUILDER_MODEL }) : fixtureDrafter(),
     bus,
     decider: devDecider,
@@ -74,6 +82,15 @@ app = await buildApp({
     teachback: useClaude
       ? claudeTeachbackWriter({ apiKey: env.ANTHROPIC_API_KEY, model: env.PATCH_MODEL })
       : { write: async (workmap) => templateTeachback(workmap) },
+  }),
+  store,
+  publish: createPublishJob({
+    store,
+    bus,
+    perception: stubPerception((sessionId, items) =>
+      app.log.info({ session_id: sessionId, clips: items.length }, 'stub perception: clips requested'),
+    ),
+    artifacts: fileArtifacts(OUT),
   }),
   healthChecks: {
     redis: async () => {

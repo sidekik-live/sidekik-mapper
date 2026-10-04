@@ -3,6 +3,7 @@ import {
   type AnswerRow,
   type ExpertMemoryRow,
   type ExpertRow,
+  type KbChunkRow,
   type OffRecordSpanRow,
   type OpenItemRow,
   type QuestionRow,
@@ -26,6 +27,7 @@ export type MemoryData = {
   open_items: OpenItemRow[];
   work_maps: WorkMapRow[];
   expert_memory: ExpertMemoryRow[];
+  kb_chunks: KbChunkRow[];
 };
 
 /** In-memory store for tests and `pnpm dev:mock`; `data` is exposed so callers can inspect writes. */
@@ -42,6 +44,7 @@ export function memoryStore(seed: Partial<MemoryData> = {}): Store & { data: Mem
     open_items: [],
     work_maps: [],
     expert_memory: [],
+    kb_chunks: [],
     ...structuredClone(seed),
   };
   const bySession = <T extends { session_id: string | null }>(rows: T[], sessionId: string) =>
@@ -78,6 +81,9 @@ export function memoryStore(seed: Partial<MemoryData> = {}): Store & { data: Mem
         .filter((o) => o.workflow_id === workflowId && o.session_id && earlier.has(o.session_id) && o.status !== 'resolved')
         .sort((a, b) => b.importance - a.importance);
     },
+    async getWorkMap(id) {
+      return data.work_maps.find((m) => m.id === id) ?? null;
+    },
     async findWorkMapBySession(sessionId) {
       const maps = data.work_maps.filter((m) => m.session_id === sessionId).sort((a, b) => b.version - a.version);
       return maps[0] ?? null;
@@ -109,6 +115,9 @@ export function memoryStore(seed: Partial<MemoryData> = {}): Store & { data: Mem
     },
     async getExpertMemory(expertId, workflowId) {
       return data.expert_memory.find((m) => m.expert_id === expertId && m.workflow_id === workflowId) ?? null;
+    },
+    async replaceKbChunks(workMapId, rows) {
+      data.kb_chunks = [...data.kb_chunks.filter((c) => c.work_map_id !== workMapId), ...structuredClone(rows)];
     },
   };
 }

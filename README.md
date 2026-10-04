@@ -65,6 +65,8 @@ pnpm dev:mock                                                         # prints t
 pnpm dev:replay dev/fixtures/capture_sabine.jsonl --speed 50          # task_done → draft → validated → "debrief requested"
 pnpm dev:replay dev/fixtures/debrief_sabine.jsonl                     # 3 follow-ups → teach-back → "work map confirmed"
 # or debrief_sabine_correction.jsonl: Sabine corrects the teach-back, hears it restated, confirms
+curl -X POST localhost:8083/internal/workmaps/<id>/publish \
+  -H 'x-internal-token: dev-mock-secret-not-for-production-0000000000'   # id from "work map confirmed"; files in dev/out/
 ```
 
 `dev/fixtures/capture_sabine.json` is Sabine's 3-invoice capture session as the database holds it after capture (screen events, turns with an off-record span, brain's questions and answers, an open item from an earlier session). `pnpm dev:mock` drafts with Claude when `ANTHROPIC_API_KEY` is set, otherwise it replays the recorded draft in `dev/fixtures/sabine-draft.json`. `capture-lifecycle.jsonl` exercises the bus routing (replay sessions ignored, duplicates dropped).
@@ -93,6 +95,14 @@ Debrief driver (`src/debrief/`), DESIGN §5, a state machine per session (`waiti
 6. **Corrections:** a `corrected` reply goes to a Sonnet correction patch (fix a step, rewrite or remove a guardrail with the correction as evidence, remove a step, add a rule), validated and saved; then only the corrected part is restated as a short `teachback` and D8 runs on the next reply. The model's restatement is used only when the whole patch applied cleanly, otherwise it is rebuilt from what changed in the map. At most two correction loops; a correction that changes nothing or fails is asked again.
 
 The driver's state is in memory: a restart mid-debrief loses it, and the map stays `in_debrief`.
+
+Publish (`src/publish/`), DESIGN §6: `POST /internal/workmaps/:id/publish` (gateway proxies it; `X-Internal-Token`) answers `202 {job_id}` for a `confirmed` map (or a `published` one, to refresh it), 404 for an unknown map and 409 otherwise. The job, one at a time per map:
+
+1. **Guardrails:** every rule must compile, or the publish fails; the G1–G5 demo cases run and failures are logged.
+2. **Clips:** asks perception for one clip per step (6 s before, 4 s after its screen moment); perception writes the `clips` rows. If perception is down the map is published without clips.
+3. **Search:** replaces the map's `kb_chunks`: one per step, guardrail and brain answer, original language plus English.
+4. **Storage:** `workmap.json`, `AGENT_RULES.md` and `guardrails.jsonlogic.json` under `workmaps/org/{org}/{id}/v{n}/`.
+5. **Announce:** status `published` with `published_at`, then `sk:workmap.published {workmap_id, workflow_id, version}` (voice loads the map from Storage, tutor from the database).
 
 ## Roadmap
 
