@@ -4,7 +4,7 @@ import { httpDecider } from './clients/brain.js';
 import { httpGateway } from './clients/gateway.js';
 import { createBus } from './contracts/index.js';
 import { loadEnv } from './env.js';
-import { claudeAnswerPatcher } from './debrief/patch.js';
+import { claudeAnswerPatcher, claudeCorrectionPatcher } from './debrief/patch.js';
 import { claudeTeachbackWriter } from './debrief/teachback.js';
 import { createHandlers } from './handlers.js';
 import { supabaseStore } from './store/supabase.js';
@@ -30,6 +30,7 @@ app = await buildApp({
     decider: httpDecider(env.BRAIN_URL, env.SK_INTERNAL_TOKEN),
     gateway: httpGateway(env.GATEWAY_INTERNAL_URL, env.SK_INTERNAL_TOKEN),
     patcher: claudeAnswerPatcher({ apiKey: env.ANTHROPIC_API_KEY, model: env.PATCH_MODEL }),
+    corrector: claudeCorrectionPatcher({ apiKey: env.ANTHROPIC_API_KEY, model: env.PATCH_MODEL }),
     teachback: claudeTeachbackWriter({ apiKey: env.ANTHROPIC_API_KEY, model: env.PATCH_MODEL }),
   }),
   healthChecks: {
