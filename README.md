@@ -67,6 +67,9 @@ pnpm dev:replay dev/fixtures/debrief_sabine.jsonl                     # 3 follow
 # or debrief_sabine_correction.jsonl: Sabine corrects the teach-back, hears it restated, confirms
 curl -X POST localhost:8083/internal/workmaps/<id>/publish \
   -H 'x-internal-token: dev-mock-secret-not-for-production-0000000000'   # id from "work map confirmed"; files in dev/out/
+curl -X POST localhost:8083/internal/tools/recall_context -H 'content-type: application/json' \
+  -H 'x-internal-token: dev-mock-secret-not-for-production-0000000000' \
+  -d '{"session_id":"00000000-0000-4000-8000-00000000d001","query":"Kranbau Dezember","scope":"workflow"}'
 ```
 
 `dev/fixtures/capture_sabine.json` is Sabine's 3-invoice capture session as the database holds it after capture (screen events, turns with an off-record span, brain's questions and answers, an open item from an earlier session). `pnpm dev:mock` drafts with Claude when `ANTHROPIC_API_KEY` is set, otherwise it replays the recorded draft in `dev/fixtures/sabine-draft.json`. `capture-lifecycle.jsonl` exercises the bus routing (replay sessions ignored, duplicates dropped).
@@ -103,6 +106,13 @@ Publish (`src/publish/`), DESIGN §6: `POST /internal/workmaps/:id/publish` (gat
 3. **Search:** replaces the map's `kb_chunks`: one per step, guardrail and brain answer, original language plus English.
 4. **Storage:** `workmap.json`, `AGENT_RULES.md` and `guardrails.jsonlogic.json` under `workmaps/org/{org}/{id}/v{n}/`.
 5. **Announce:** status `published` with `published_at`, then `sk:workmap.published {workmap_id, workflow_id, version}` (voice loads the map from Storage, tutor from the database).
+
+`recall_context` (`src/recall/`), the interviewer's webhook tool through the gateway (`POST /internal/tools/recall_context {session_id, query, scope}`, 1 s budget) → `{snippets: [{text, t_ms, source}]}`, at most 5:
+
+- `scope: "workflow"`: the workflow's published knowledge from `search_kb()` (Postgres full-text, trigram fallback; given 600 ms, skipped if slow or down).
+- `scope: "session"` (default): this session's on-record expert turns.
+- Both: the session's last 20 screen events that match the query (an opened record carries its supplier, amount, category, company code, cost center and month).
+- Ranked together, best first; if nothing matches, the 2 newest screen events. Nothing from an off-record span is ever returned.
 
 ## Roadmap
 

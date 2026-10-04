@@ -109,6 +109,9 @@ export type KbChunkRow = {
   content: string;
 };
 
+/** A `search_kb()` hit (SCHEMA.md 0005): full-text rank, or trigram similarity as the fallback. */
+export type KbHit = { id: string; kind: KbChunkRow['kind']; ref_id: string | null; content: string; score: number };
+
 export type ExpertMemoryRow = { expert_id: string; workflow_id: string; summary: string };
 
 /** Everything the build job reads about one capture session. */
@@ -150,4 +153,6 @@ export interface Store {
   getExpertMemory(expertId: string, workflowId: string): Promise<ExpertMemoryRow | null>;
   /** Replaces every search chunk of the Work Map with `rows`. */
   replaceKbChunks(workMapId: string, rows: KbChunkRow[]): Promise<void>;
+  /** The workflow's best search chunks for a query (`search_kb()`), best first. */
+  searchKb(orgId: string, workflowId: string, query: string, limit: number): Promise<KbHit[]>;
 }
