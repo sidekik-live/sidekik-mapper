@@ -1,15 +1,20 @@
 // `pnpm dev:mock`: the mapper against real Redis with no teammates' services and no Supabase.
 // The store is in memory, seeded with Sabine's capture session (dev/fixtures/capture_sabine.json).
-// Drafts come from Claude when ANTHROPIC_API_KEY is set, otherwise from dev/fixtures/sabine-draft.json.
-// Trigger a build with `pnpm dev:replay dev/fixtures/capture_sabine.jsonl`.
-// Brain answers D6 with a fixed score; the gateway phase call is logged instead of sent.
+// With ANTHROPIC_API_KEY set, drafts, answer patches and the teach-back come from Claude; without
+// it, the draft is dev/fixtures/sabine-draft.json, answers change nothing and the teach-back is a template.
+// Build with `pnpm dev:replay dev/fixtures/capture_sabine.jsonl`, then run the debrief with
+// `pnpm dev:replay dev/fixtures/debrief_sabine.jsonl`.
+// Brain is a stand-in (below); the gateway phase calls are logged instead of sent.
 // A perception stub is added with the ticket that first calls it.
 import { buildApp } from '../app.js';
 import { claudeDrafter } from '../build/drafter.js';
-import { stubDecider } from '../clients/brain.js';
+import { D6_HAS_GAPS, stubDecider, type Decider } from '../clients/brain.js';
 import { stubGateway } from '../clients/gateway.js';
 import { createBus } from '../contracts/index.js';
 import { loadEnv } from '../env.js';
+import { plainYes } from '../debrief/driver.js';
+import { claudeAnswerPatcher, noopPatcher } from '../debrief/patch.js';
+import { claudeTeachbackWriter, templateTeachback } from '../debrief/teachback.js';
 import { createHandlers } from '../handlers.js';
 import { memoryStore } from '../store/memory.js';
 import { fixtureDrafter, sabineCapture } from './fixtures.js';
@@ -29,6 +34,23 @@ const env = loadEnv({
   ...process.env,
 });
 
+/**
+ * Brain stand-in: D6 finds gaps (every open item stays), D12 says the expert isn't done, and D8
+ * confirms a plain yes ("Ja, passt.") and finds anything else unclear.
+ */
+const stubBrain = stubDecider({ D6: D6_HAS_GAPS, D12: { expert_signals_done: { answer: false, confidence: 0.9, p_true: 0.1 } } });
+const devDecider: Decider = {
+  decide: (sessionId, decisions) =>
+    Promise.all(
+      decisions.map(async (d) => {
+        if (d.id !== 'D8') return (await stubBrain.decide(sessionId, [d]))[0]!;
+        const yes = plainYes((d.state as { reply: string }).reply);
+        const answer = { answer: yes ? 'confirmed' : 'unclear', confidence: 0.9 };
+        return (await stubDecider({ D8: { teachback_reply: answer } }).decide(sessionId, [d]))[0]!;
+      }),
+    ),
+};
+
 let app: Awaited<ReturnType<typeof buildApp>>;
 const bus = createBus(env.REDIS_URL, 'mapper', {
   warn: (obj, msg) => app.log.warn(obj, msg),
@@ -42,8 +64,12 @@ app = await buildApp({
     store: memoryStore(sabineCapture()),
     drafter: useClaude ? claudeDrafter({ apiKey: env.ANTHROPIC_API_KEY, model: env.BUILDER_MODEL }) : fixtureDrafter(),
     bus,
-    decider: stubDecider(),
+    decider: devDecider,
     gateway: stubGateway((sessionId, body) => app.log.info({ session_id: sessionId, ...body }, 'stub gateway: phase')),
+    patcher: useClaude ? claudeAnswerPatcher({ apiKey: env.ANTHROPIC_API_KEY, model: env.PATCH_MODEL }) : noopPatcher,
+    teachback: useClaude
+      ? claudeTeachbackWriter({ apiKey: env.ANTHROPIC_API_KEY, model: env.PATCH_MODEL })
+      : { write: async (workmap) => templateTeachback(workmap) },
   }),
   healthChecks: {
     redis: async () => {

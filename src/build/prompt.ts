@@ -24,7 +24,7 @@ export const mmss = (ms: number) => {
 /** Record state only where it matters for rules: when a record opens or a field changes. */
 const WITH_RECORD = new Set(['record_opened', 'field_changed']);
 
-function eventLine(e: ScreenEventRow): string {
+export function eventLine(e: ScreenEventRow): string {
   const line: Record<string, unknown> = { event_id: e.event_id, t: mmss(e.t_ms), type: e.type };
   if (e.entity_kind) line.entity = e.entity_id ? `${e.entity_kind} ${e.entity_id}` : e.entity_kind;
   if (e.field) line.field = e.field;
