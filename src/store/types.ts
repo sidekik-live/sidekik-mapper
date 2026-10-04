@@ -97,6 +97,8 @@ export type WorkMapRow = {
   json: WorkMap;
 };
 
+export type ExpertMemoryRow = { expert_id: string; workflow_id: string; summary: string };
+
 /** Everything the build job reads about one capture session. */
 export type SessionCapture = {
   screenEvents: ScreenEventRow[];
@@ -126,4 +128,10 @@ export interface Store {
   latestWorkMapVersion(workflowId: string): Promise<number>;
   /** Inserts the Work Map, then its open items. Throws VersionConflictError on a duplicate version. */
   insertWorkMap(row: WorkMapRow, openItems: OpenItemRow[]): Promise<void>;
+  updateWorkMap(id: string, patch: Pick<WorkMapRow, 'status' | 'json'>): Promise<void>;
+  /** The Work Map's open items, most important first. */
+  listOpenItems(workMapId: string): Promise<OpenItemRow[]>;
+  /** Replaces every open item of the Work Map with `rows`. */
+  replaceOpenItems(workMapId: string, rows: OpenItemRow[]): Promise<void>;
+  getExpertMemory(expertId: string, workflowId: string): Promise<ExpertMemoryRow | null>;
 }

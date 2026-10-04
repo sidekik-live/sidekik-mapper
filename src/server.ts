@@ -1,5 +1,7 @@
 import { buildApp } from './app.js';
 import { claudeDrafter } from './build/drafter.js';
+import { httpDecider } from './clients/brain.js';
+import { httpGateway } from './clients/gateway.js';
 import { createBus } from './contracts/index.js';
 import { loadEnv } from './env.js';
 import { createHandlers } from './handlers.js';
@@ -23,6 +25,8 @@ app = await buildApp({
     store: supabaseStore(supabase),
     drafter: claudeDrafter({ apiKey: env.ANTHROPIC_API_KEY, model: env.BUILDER_MODEL }),
     bus,
+    decider: httpDecider(env.BRAIN_URL, env.SK_INTERNAL_TOKEN),
+    gateway: httpGateway(env.GATEWAY_INTERNAL_URL, env.SK_INTERNAL_TOKEN),
   }),
   healthChecks: {
     supabase: supabaseHealth(supabase),

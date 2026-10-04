@@ -6,7 +6,7 @@ export const JsonLogicSchema = z.record(z.unknown());
 export type JsonLogic = z.infer<typeof JsonLogicSchema>;
 
 /** The only variables a guardrail rule may read. */
-export const ALLOWED_RULE_VARIABLES = [
+export const JSONLOGIC_VARIABLES = [
   'net_amount',
   'currency',
   'category',

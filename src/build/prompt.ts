@@ -1,4 +1,4 @@
-import { ALLOWED_RULE_VARIABLES } from '../contracts/index.js';
+import { JSONLOGIC_VARIABLES } from '../contracts/index.js';
 import type { ScreenEventRow } from '../store/types.js';
 import type { BuildInput } from './gather.js';
 
@@ -10,7 +10,7 @@ How to build the map:
 - Describe the workflow, not the individual records. If the expert handled several invoices, a step is something they do for every invoice (or for every invoice of a kind), and different invoices are evidence for the same step.
 - Every step and every guardrail must cite at least one event_id from <screen_events> and at least one turn_id from <expert_turns>. Use only IDs that appear in the input. When you can't support a step or rule with both, leave it out and add an open item asking about it instead.
 - Quote reasons and guardrails verbatim from the cited turn, in the language the expert spoke, and add an English translation. Don't paraphrase inside a quote; if no turn states the reason, set reason to null and consider an open item.
-- Write each rule as JSON-Logic over the invoice record, using only these variables: ${ALLOWED_RULE_VARIABLES.join(', ')}. The rule evaluates to true when the guardrail is triggered (the invoice needs the consequence). Example: {"and":[{">":[{"var":"net_amount"},5000]},{"==":[{"var":"category"},"equipment"]},{"!=":[{"var":"cost_center"},"0400"]}]}.
+- Write each rule as JSON-Logic over the invoice record, using only these variables: ${JSONLOGIC_VARIABLES.join(', ')}. The rule evaluates to true when the guardrail is triggered (the invoice needs the consequence). Example: {"and":[{">":[{"var":"net_amount"},5000]},{"==":[{"var":"category"},"equipment"]},{"!=":[{"var":"cost_center"},"0400"]}]}.
 - Mark a step as a judgment call when the right action depends on a condition the expert weighed, not routine data entry.
 - Produce 3 to 8 open items, most important first: the gaps a new hire would trip over, unanswered or vague answers, unasked questions still worth asking, and earlier open items still unresolved. Phrase each as a question the expert can answer briefly.
 

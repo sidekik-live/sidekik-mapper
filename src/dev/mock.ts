@@ -2,9 +2,12 @@
 // The store is in memory, seeded with Sabine's capture session (dev/fixtures/capture_sabine.json).
 // Drafts come from Claude when ANTHROPIC_API_KEY is set, otherwise from dev/fixtures/sabine-draft.json.
 // Trigger a build with `pnpm dev:replay dev/fixtures/capture_sabine.jsonl`.
-// Stubs for brain, perception and the gateway phase API are added with the tickets that call them.
+// Brain answers D6 with a fixed score; the gateway phase call is logged instead of sent.
+// A perception stub is added with the ticket that first calls it.
 import { buildApp } from '../app.js';
 import { claudeDrafter } from '../build/drafter.js';
+import { stubDecider } from '../clients/brain.js';
+import { stubGateway } from '../clients/gateway.js';
 import { createBus } from '../contracts/index.js';
 import { loadEnv } from '../env.js';
 import { createHandlers } from '../handlers.js';
@@ -39,6 +42,8 @@ app = await buildApp({
     store: memoryStore(sabineCapture()),
     drafter: useClaude ? claudeDrafter({ apiKey: env.ANTHROPIC_API_KEY, model: env.BUILDER_MODEL }) : fixtureDrafter(),
     bus,
+    decider: stubDecider(),
+    gateway: stubGateway((sessionId, body) => app.log.info({ session_id: sessionId, ...body }, 'stub gateway: phase')),
   }),
   healthChecks: {
     redis: async () => {
