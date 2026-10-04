@@ -109,6 +109,8 @@ Publish (`src/publish/`), DESIGN §6: `POST /internal/workmaps/:id/publish` (gat
 4. **Storage:** `workmap.json`, `AGENT_RULES.md` and `guardrails.jsonlogic.json` under `workmaps/org/{org}/{id}/v{n}/`.
 5. **Announce:** status `published` with `published_at`, then `sk:workmap.published {workmap_id, workflow_id, version}` (voice loads the map from Storage, tutor from the database).
 
+Expert memory (`src/memory/`), one `expert_memory` row per expert and workflow: a summary of at most 1,500 characters (the map's steps with the expert's own reasons for judgment calls, its rules, how many questions are open) and the ids of the expert's unresolved open items across their capture sessions. The gateway reads it for the next capture session (`{{prior_summary}}`, `{{open_items}}`) and the debrief uses the summary. It is written at publish (after the announcement; a failure doesn't fail the publish) and when a capture session ends (from that session's map, whatever its status; without a map only the open items are refreshed). The summary is built from the map, not generated, so it repeats only what the expert confirmed.
+
 Export (`src/publish/export.ts`): `GET /internal/workmaps/:id/export?format=agent` (gateway relays `GET /v1/workmaps/:id/export`) downloads `<title>-v<n>-agent-rules.zip` with `AGENT_RULES.md` and `guardrails.jsonlogic.json`, rendered exactly as publish writes them. Offered once the expert has confirmed the map (`confirmed` or `published`), 409 before that.
 
 `recall_context` (`src/recall/`), the interviewer's webhook tool through the gateway (`POST /internal/tools/recall_context {session_id, query, scope}`, 1 s budget) → `{snippets: [{text, t_ms, source}]}`, at most 5:

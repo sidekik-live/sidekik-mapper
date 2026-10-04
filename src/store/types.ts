@@ -161,7 +161,8 @@ export type WorkMapRows = { steps: WorkMapStepRow[]; guardrails: WorkMapGuardrai
 /** A `search_kb()` hit (SCHEMA.md 0005): full-text rank, or trigram similarity as the fallback. */
 export type KbHit = { id: string; kind: KbChunkRow['kind']; ref_id: string | null; content: string; score: number };
 
-export type ExpertMemoryRow = { expert_id: string; workflow_id: string; summary: string };
+/** `expert_memory`: one per expert and workflow. */
+export type ExpertMemoryRow = { expert_id: string; workflow_id: string; summary: string; open_item_ids: string[] };
 
 /** Everything the build job reads about one capture session. */
 export type SessionCapture = {
@@ -185,8 +186,8 @@ export interface Store {
   getWorkflow(id: string): Promise<WorkflowRow | null>;
   getExpert(id: string): Promise<ExpertRow | null>;
   loadCapture(sessionId: string): Promise<SessionCapture>;
-  /** Unresolved open items from this expert's earlier sessions on the workflow. */
-  listCarriedOverOpenItems(workflowId: string, expertId: string, excludeSessionId: string): Promise<OpenItemRow[]>;
+  /** This expert's unresolved open items on the workflow, from all their capture sessions except `excludeSessionId`. */
+  listCarriedOverOpenItems(workflowId: string, expertId: string, excludeSessionId?: string): Promise<OpenItemRow[]>;
   getWorkMap(id: string): Promise<WorkMapRow | null>;
   findWorkMapBySession(sessionId: string): Promise<WorkMapRow | null>;
   /** Highest version for the workflow, or 0 when it has none. */
@@ -200,6 +201,8 @@ export interface Store {
   /** Replaces every open item of the Work Map with `rows`. */
   replaceOpenItems(workMapId: string, rows: OpenItemRow[]): Promise<void>;
   getExpertMemory(expertId: string, workflowId: string): Promise<ExpertMemoryRow | null>;
+  /** Inserts or replaces the memory for (expert_id, workflow_id), stamping updated_at. */
+  upsertExpertMemory(row: ExpertMemoryRow & { org_id: string }): Promise<void>;
   /**
    * Makes the Work Map's `work_map_steps`, `guardrails` and `step_evidence` match `rows`: removed
    * steps and guardrails are deleted, the rest upserted by id (keeping columns other services

@@ -125,7 +125,7 @@ describe('build job', () => {
 
   it('starts the debrief with the top open items and the prior summary', async () => {
     const { store, phases, build } = setup();
-    store.data.expert_memory.push({ expert_id: SABINE.expert, workflow_id: SABINE.workflow, summary: 'Codes invoices for DE01 and CZ01.' });
+    store.data.expert_memory.push({ expert_id: SABINE.expert, workflow_id: SABINE.workflow, summary: 'Codes invoices for DE01 and CZ01.', open_item_ids: [] });
     await build(taskDone(), silentLog());
     expect(phases).toHaveLength(1);
     expect(phases[0]!.sessionId).toBe(SABINE.session);
