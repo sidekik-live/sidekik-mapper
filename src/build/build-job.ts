@@ -4,6 +4,7 @@ import type { Decider } from '../clients/brain.js';
 import type { GatewayClient } from '../clients/gateway.js';
 import type { Bus, Envelope, SessionLifecycle, WorkMap } from '../contracts/index.js';
 import type { DemoResult } from '../guardrails/demo-cases.js';
+import type { CaptureBuffer } from '../services/capture-buffer.js';
 import { claudeUsageRecords, publishUsage } from '../services/usage.js';
 import { VersionConflictError, type OpenItemRow, type SessionRow, type Store, type WorkMapRow } from '../store/types.js';
 import { assembleWorkMap } from './assemble.js';
@@ -13,7 +14,15 @@ import { renderInput } from './prompt.js';
 import { scoreOpenItems } from './score.js';
 import { validateWorkMap } from './validate.js';
 
-export type BuildDeps = { store: Store; drafter: Drafter; bus: Bus; decider: Decider; gateway: GatewayClient };
+export type BuildDeps = {
+  store: Store;
+  drafter: Drafter;
+  bus: Bus;
+  decider: Decider;
+  gateway: GatewayClient;
+  /** Screen events and turns from the bus, merged with the database's (optional). */
+  capture?: CaptureBuffer;
+};
 
 export type BuildOutcome =
   | { status: 'handed_over'; workmap: WorkMap; issues: string[]; demo: DemoResult[] }
@@ -46,7 +55,7 @@ export function createBuildJob(deps: BuildDeps) {
       return skip(log, `work map ${existing.id} (v${existing.version}) is already ${existing.status}`);
     }
 
-    const { input, stats } = await gather(deps.store, session, renderInput);
+    const { input, stats } = await gather(deps.store, session, renderInput, deps.capture);
     log.info({ ...stats, questions_asked: input.asked.length, carried_over: input.carriedOver.length }, 'session gathered');
 
     const draft = existing

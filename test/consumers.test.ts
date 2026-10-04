@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STREAMS } from '../src/contracts/index.js';
+import { makeEvent, STREAMS } from '../src/contracts/index.js';
 import { startConsumers } from '../src/services/consumers.js';
 import { JobRunner } from '../src/services/jobs.js';
 import { fakeBus, IDS, lifecycleEvent, recordingHandlers, silentLog, turnEvent } from './helpers.js';
@@ -100,5 +100,22 @@ describe('startConsumers', () => {
     // The original session is unaffected.
     await bus.deliver(STREAMS.turns, turnEvent('live'));
     expect(rec.calls.map((c) => c.handler)).toEqual(['turn']);
+  });
+
+  it('routes screen events, and ignores those of a replay session', async () => {
+    const { bus, rec } = setup();
+    const screen = (sessionId: string) =>
+      makeEvent({
+        type: 'screen.event',
+        org_id: IDS.org,
+        session_id: sessionId,
+        t_ms: 0,
+        producer: 'perception' as const,
+        data: { event_id: `se-${sessionId}`, type: 'record_opened' as const, state: {}, confidence: 0.9, source: 'dom' as const },
+      });
+    await bus.deliver(STREAMS.lifecycle, lifecycleEvent({ event: 'started', mode: 'replay' }, IDS.replay));
+    await bus.deliver(STREAMS.screen, screen(IDS.session));
+    await bus.deliver(STREAMS.screen, screen(IDS.replay));
+    expect(rec.calls.map((c) => [c.handler, c.session_id])).toEqual([['screen', IDS.session]]);
   });
 });

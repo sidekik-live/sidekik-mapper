@@ -86,7 +86,7 @@ Bus handling: every handler is idempotent on `event.id`, and every event of a re
 
 Build job (`src/build/`), DESIGN §4:
 
-1. **Gather** the session's change events and the expert's on-record turns (anything in an off-record span is dropped), brain's questions and answers, unasked questions and this expert's unresolved open items; trim screen events to a ~60k-token budget.
+1. **Gather** the session's change events and the expert's on-record turns (from the database, plus what came off the bus on `sk:screen.events` and `sk:transcript.turns` that isn't stored yet) (anything in an off-record span is dropped), brain's questions and answers, unasked questions and this expert's unresolved open items; trim screen events to a ~60k-token budget.
 2. **Draft** with Claude Sonnet (`BUILDER_MODEL`) as structured output with server-side refusal fallback, retrying once on an invalid draft; save it as a `draft` with its `open_items`. IDs, timestamps, keyframes and source labels come from the session rows, not the model. Token usage goes to `sk:usage`.
 3. **Validate** in code (`validate.ts`): unknown event and turn IDs are dropped, quotes must be verbatim in the cited turn (re-cited or replaced otherwise), rules must parse and read only `InvoiceState` variables, and every step and guardrail keeps a screen event and the expert's words; what can't be repaired becomes an open item. The G1–G5 demo cases (`src/guardrails/demo-cases.ts`) run against the result and are logged.
 4. **Score** open items with brain's D6 and drop the trivial ones (never below three; kept as-is if brain is down).
@@ -103,7 +103,7 @@ Debrief driver (`src/debrief/`), DESIGN §5, a state machine per session (`waiti
 
 The driver's state is in memory: a restart mid-debrief loses it, and the map stays `in_debrief`.
 
-Publish (`src/publish/`), DESIGN §6: `POST /internal/workmaps/:id/publish` (gateway proxies it; `X-Internal-Token`) answers `202 {job_id}` for a `confirmed` map (or a `published` one, to refresh it), 404 for an unknown map and 409 otherwise. The job, one at a time per map:
+Publish (`src/publish/`), DESIGN §6: the debrief queues it as soon as the expert confirms (ARCHITECTURE §8), and `POST /internal/workmaps/:id/publish` (gateway proxies it; `X-Internal-Token`) queues it on demand, on the same job runner, so the two never run twice for a map at once. The route answers `202 {job_id}` for a `confirmed` map (or a `published` one, to refresh it), 404 for an unknown map and 409 otherwise. The job, one at a time per map:
 
 1. **Guardrails:** every rule must compile, or the publish fails; the G1–G5 demo cases run and failures are logged.
 2. **Clips:** asks perception for one clip per step (6 s before, 4 s after its screen moment); perception writes the `clips` rows. If perception is down the map is published without clips.

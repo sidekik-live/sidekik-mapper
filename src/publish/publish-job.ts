@@ -3,6 +3,7 @@ import type { PerceptionClient } from '../clients/perception.js';
 import { makeEvent, STREAMS, WorkMapSchema, type Bus, type WorkMap, type WorkMapPublished } from '../contracts/index.js';
 import { runDemoCases, type DemoResult } from '../guardrails/demo-cases.js';
 import { updateExpertMemory } from '../memory/expert-memory.js';
+import { mergeCapture, type CaptureBuffer } from '../services/capture-buffer.js';
 import { checkRule } from '../guardrails/rules.js';
 import type { ArtifactStore } from '../store/artifacts.js';
 import type { Store, WorkMapRow } from '../store/types.js';
@@ -10,7 +11,14 @@ import { agentRules, compiledGuardrails } from './artifacts.js';
 import { kbChunks } from './chunks.js';
 import { syncWorkMapRows } from './rows.js';
 
-export type PublishDeps = { store: Store; bus: Bus; perception: PerceptionClient; artifacts: ArtifactStore };
+export type PublishDeps = {
+  store: Store;
+  bus: Bus;
+  perception: PerceptionClient;
+  artifacts: ArtifactStore;
+  /** Screen events from the bus, for evidence keyframes the database doesn't have (optional). */
+  capture?: CaptureBuffer;
+};
 
 /** Statuses a Work Map can be published from; publishing a published map again refreshes it. */
 export const PUBLISHABLE = ['confirmed', 'published'] as const;
@@ -58,10 +66,15 @@ export function createPublishJob(deps: PublishDeps) {
     const failing = demo.filter((d) => !d.pass);
     if (failing.length > 0) log.warn({ demo_cases_failed: failing.map((d) => `${d.name}: ${d.problem}`) }, 'demo guardrail cases failing');
 
-    const [capture, expert] = await Promise.all([
-      row.session_id ? deps.store.loadCapture(row.session_id) : Promise.resolve({ answers: [], questions: [], screenEvents: [] }),
+    const [stored, expert] = await Promise.all([
+      row.session_id ? deps.store.loadCapture(row.session_id) : Promise.resolve(null),
       deps.store.getExpert(row.expert_id),
     ]);
+    const capture = stored
+      ? deps.capture && row.session_id
+        ? mergeCapture(stored, deps.capture.get(row.session_id))
+        : stored
+      : { answers: [], questions: [], screenEvents: [] };
     const expertName = expert?.display_name ?? 'the expert';
 
     // 2. The normalized rows (steps, guardrails, evidence) before the clips, which reference steps.

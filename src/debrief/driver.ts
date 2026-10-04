@@ -17,6 +17,7 @@ import {
   type WorkMap,
 } from '../contracts/index.js';
 import { syncWorkMapRows } from '../publish/rows.js';
+import type { CaptureBuffer } from '../services/capture-buffer.js';
 import { KeyedQueue } from '../services/keyed-queue.js';
 import { claudeUsageRecords, publishUsage, type ClaudeUsage } from '../services/usage.js';
 import type { OpenItemRow, Store, TranscriptTurnRow } from '../store/types.js';
@@ -65,6 +66,13 @@ export type DebriefDeps = {
   corrector: CorrectionPatcher;
   teachback: TeachbackWriter;
   timing?: Partial<DebriefTiming>;
+  /** Screen events and turns from the bus, merged with the database's (optional). */
+  capture?: CaptureBuffer;
+  /**
+   * Called once the expert confirmed the map. The server queues the publish job here
+   * (ARCHITECTURE §8: mapper publishes `workmap.published` after D8 confirms).
+   */
+  onConfirmed?: (workmap: { id: string; org_id: string; session_id: string }, log: FastifyBaseLogger) => void;
 };
 
 type Phase = 'waiting_greeting' | 'followups' | 'confirming';
@@ -130,7 +138,7 @@ export class DebriefDriver {
       }
       const capture = { ...session, expert_id: session.expert_id };
       const [{ input }, items] = await Promise.all([
-        gather(this.deps.store, capture, renderInput),
+        gather(this.deps.store, capture, renderInput, this.deps.capture),
         this.deps.store.listOpenItems(row.id),
       ]);
       const st: State = {
@@ -461,6 +469,11 @@ export class DebriefDriver {
     } catch (err) {
       // The Work Map is confirmed either way; only the UI's phase lags.
       st.log.error({ err }, 'gateway confirmed phase failed');
+    }
+    try {
+      this.deps.onConfirmed?.({ id: st.workmap.id, org_id: st.session.org_id, session_id: st.session.id }, st.log);
+    } catch (err) {
+      st.log.error({ err }, 'publishing after confirmation could not be queued');
     }
   }
 

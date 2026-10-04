@@ -19,10 +19,13 @@ import { createBus } from '../contracts/index.js';
 import { loadEnv } from '../env.js';
 import { createServiceLogger } from '../logger.js';
 import { redisHealth } from '../redis-health.js';
+import { CaptureBuffer } from '../services/capture-buffer.js';
+import { JobRunner } from '../services/jobs.js';
 import { plainYes } from '../debrief/driver.js';
 import { claudeAnswerPatcher, claudeCorrectionPatcher, noopCorrector, noopPatcher } from '../debrief/patch.js';
 import { claudeTeachbackWriter, templateTeachback } from '../debrief/teachback.js';
 import { createHandlers } from '../handlers.js';
+import { publishOnConfirm } from '../publish/on-confirm.js';
 import { createPublishJob } from '../publish/publish-job.js';
 import { fileArtifacts } from '../store/artifacts.js';
 import { memoryStore } from '../store/memory.js';
@@ -69,10 +72,24 @@ const log = createServiceLogger(env.LOG_LEVEL);
 const bus = createBus(env.REDIS_URL, 'mapper', { logger: log.child({ component: 'bus' }) });
 const redis = redisHealth(env.REDIS_URL, log);
 
+const capture = new CaptureBuffer();
+const jobs = new JobRunner({ log: log.child({ component: 'jobs' }) });
+const publish = createPublishJob({
+  store,
+  bus,
+  capture,
+  perception: stubPerception((sessionId, items) =>
+    log.info({ session_id: sessionId, clips: items.length }, 'stub perception: clips requested'),
+  ),
+  artifacts: fileArtifacts(OUT),
+});
+
 const app = await buildApp({
   env,
   bus,
   handlers: createHandlers({
+    capture,
+    onConfirmed: publishOnConfirm(jobs, publish),
     store,
     drafter: useClaude ? claudeDrafter({ apiKey: env.ANTHROPIC_API_KEY, model: env.BUILDER_MODEL }) : fixtureDrafter(),
     bus,
@@ -86,14 +103,8 @@ const app = await buildApp({
   }),
   store,
   comparator: useClaude ? claudeComparator({ apiKey: env.ANTHROPIC_API_KEY, model: env.PATCH_MODEL }) : structuralComparator,
-  publish: createPublishJob({
-    store,
-    bus,
-    perception: stubPerception((sessionId, items) =>
-      log.info({ session_id: sessionId, clips: items.length }, 'stub perception: clips requested'),
-    ),
-    artifacts: fileArtifacts(OUT),
-  }),
+  publish,
+  jobs,
   healthChecks: {
     redis: redis.check,
   },

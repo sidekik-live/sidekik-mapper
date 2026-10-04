@@ -118,6 +118,7 @@ export function recordingHandlers() {
     },
     debrief: record('debrief'),
     turn: record('turn'),
+    screen: record('screen'),
     ended: record('ended'),
   };
   return { handlers, calls, state, release: () => release() };

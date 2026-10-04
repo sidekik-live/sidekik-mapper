@@ -1,4 +1,5 @@
 import type { ScreenEventType } from '../contracts/index.js';
+import { mergeCapture, type CaptureBuffer } from '../services/capture-buffer.js';
 import type {
   AnswerRow,
   OffRecordSpanRow,
@@ -59,14 +60,17 @@ export async function gather(
   store: Store,
   session: SessionRow & { expert_id: string },
   render: (input: BuildInput) => string,
+  /** Screen events and turns from the bus, for what the database doesn't have yet. */
+  buffer?: CaptureBuffer,
 ): Promise<{ input: BuildInput; stats: GatherStats }> {
-  const [capture, workflow, expert, carriedOver] = await Promise.all([
+  const [stored, workflow, expert, carriedOver] = await Promise.all([
     store.loadCapture(session.id),
     store.getWorkflow(session.workflow_id),
     store.getExpert(session.expert_id),
     store.listCarriedOverOpenItems(session.workflow_id, session.expert_id, session.id),
   ]);
 
+  const capture = buffer ? mergeCapture(stored, buffer.get(session.id)) : stored;
   const offRecord = isOffRecord(capture.offRecordSpans);
   const changeEvents = capture.screenEvents.filter((e) => CHANGE_EVENTS.has(e.type));
   const events = changeEvents.filter((e) => !offRecord(e.t_ms));
