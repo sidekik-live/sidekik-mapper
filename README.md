@@ -53,22 +53,27 @@ pnpm dev            # tsx watch, reads .env
 | `pnpm build` / `pnpm start` | Compile to `dist/` / run the compiled server |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm test` | vitest (the G1–G5 guardrail tests join with ticket 3) |
-| `pnpm dev:mock` | Run against Redis only: no Supabase, dev env defaults, teammates' services stubbed |
+| `pnpm dev:mock` | Run against Redis only: in-memory store seeded with Sabine's session, no Supabase, teammates' services stubbed |
 | `pnpm dev:replay <file.jsonl>` | Publish fixture events onto the bus (`--speed`, `--session`) |
+| `pnpm dev:draft [--out file]` | Draft a Work Map from Sabine's fixture with the real Claude model and print it (costs a few cents) |
 
 ### Running without teammates' services
 
 ```bash
 docker compose -f ../sidekik-platform/dev/docker-compose.yml up -d   # Redis
 pnpm dev:mock                                                         # prints the dev internal token
-pnpm dev:replay dev/fixtures/capture-lifecycle.jsonl --speed 5        # watch the log for "build job queued"
+pnpm dev:replay dev/fixtures/capture_sabine.jsonl --speed 50          # task_done → "draft work map saved"
 ```
+
+`dev/fixtures/capture_sabine.json` is Sabine's 3-invoice capture session as the database holds it after capture (screen events, turns with an off-record span, brain's questions and answers, an open item from an earlier session). `pnpm dev:mock` drafts with Claude when `ANTHROPIC_API_KEY` is set, otherwise it replays the recorded draft in `dev/fixtures/sabine-draft.json`. `capture-lifecycle.jsonl` exercises the bus routing (replay sessions ignored, duplicates dropped).
 
 Brain, perception and the gateway phase API get stubs in the tickets that first call them.
 
 The service checks every env var at boot and exits with a list of the ones that are missing. `GET /healthz` returns `{ok, version, deps}`, with 503 when Redis or Supabase is down.
 
 Bus handling: every handler is idempotent on `event.id`, and every event of a replay session (`mode:"replay"`) is ignored. `task_done` queues a build job in an in-process queue: one active job per session, jobs for one session run in order, and on shutdown the service stops consuming, lets running jobs finish, then closes the bus.
+
+Build job (`src/build/`): gathers the session's change events and the expert's on-record turns (anything in an off-record span is dropped), brain's questions and answers, unasked questions and this expert's unresolved open items; trims screen events to a ~60k-token budget; asks Claude Sonnet (`BUILDER_MODEL`) for the draft as structured output with server-side refusal fallback, retrying once on an invalid draft; then saves the `work_maps` row (status `draft`) and its `open_items`. IDs, timestamps, keyframes and source labels come from the session rows, not the model. Token usage goes to `sk:usage`.
 
 ## Roadmap
 

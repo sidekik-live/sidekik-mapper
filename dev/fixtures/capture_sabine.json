@@ -1,0 +1,797 @@
+{
+ "_comment": "Sabine's 3-invoice capture session as the database holds it after capture (perception, voice and brain rows). Seeds the memory store in pnpm dev:mock, pnpm dev:draft and the build tests. Off-record: span 125–135 s (se-14, tt-11, tt-12 must not reach the draft).",
+ "sessions": [
+  {
+   "id": "00000000-0000-4000-8000-00000000d001",
+   "org_id": "00000000-0000-4000-8000-00000000a001",
+   "workflow_id": "00000000-0000-4000-8000-00000000b001",
+   "kind": "capture",
+   "mode": "browser",
+   "expert_id": "00000000-0000-4000-8000-00000000e001",
+   "language": "de"
+  },
+  {
+   "id": "00000000-0000-4000-8000-00000000d000",
+   "org_id": "00000000-0000-4000-8000-00000000a001",
+   "workflow_id": "00000000-0000-4000-8000-00000000b001",
+   "kind": "capture",
+   "mode": "browser",
+   "expert_id": "00000000-0000-4000-8000-00000000e001",
+   "language": "de"
+  },
+  {
+   "id": "00000000-0000-4000-8000-00000000d009",
+   "org_id": "00000000-0000-4000-8000-00000000a001",
+   "workflow_id": "00000000-0000-4000-8000-00000000b001",
+   "kind": "capture",
+   "mode": "browser",
+   "expert_id": "00000000-0000-4000-8000-00000000e002",
+   "language": "de"
+  }
+ ],
+ "workflows": [
+  {
+   "id": "00000000-0000-4000-8000-00000000b001",
+   "org_id": "00000000-0000-4000-8000-00000000a001",
+   "name": "Supplier invoice coding"
+  }
+ ],
+ "experts": [
+  {
+   "id": "00000000-0000-4000-8000-00000000e001",
+   "org_id": "00000000-0000-4000-8000-00000000a001",
+   "display_name": "Sabine"
+  },
+  {
+   "id": "00000000-0000-4000-8000-00000000e002",
+   "org_id": "00000000-0000-4000-8000-00000000a001",
+   "display_name": "Jürgen"
+  }
+ ],
+ "screen_events": [
+  {
+   "event_id": "se-01",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "t_ms": 2000,
+   "type": "app_opened",
+   "entity_kind": null,
+   "entity_id": null,
+   "field": null,
+   "before_val": null,
+   "after_val": null,
+   "state": {
+    "app": "MiniERP",
+    "screen": "Inbox"
+   },
+   "confidence": 0.95,
+   "source": "dom",
+   "keyframe_id": null
+  },
+  {
+   "event_id": "se-02",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "t_ms": 5000,
+   "type": "record_opened",
+   "entity_kind": "invoice",
+   "entity_id": "4471",
+   "field": null,
+   "before_val": null,
+   "after_val": null,
+   "state": {
+    "app": "MiniERP",
+    "screen": "Invoice",
+    "record": {
+     "invoice_id": "4471",
+     "supplier": "Präzisionswerk Ulm",
+     "supplier_known": true,
+     "net_amount": 6350,
+     "currency": "EUR",
+     "invoice_date": "2026-09-14",
+     "invoice_month": 9,
+     "company_code": "DE01",
+     "category": "equipment",
+     "cost_center": "4711",
+     "approvals_count": 1
+    }
+   },
+   "confidence": 0.95,
+   "source": "dom",
+   "keyframe_id": "00000000-0000-4000-8000-000000000f01"
+  },
+  {
+   "event_id": "se-03",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "t_ms": 12000,
+   "type": "value_read",
+   "entity_kind": "invoice",
+   "entity_id": "4471",
+   "field": "supplier_known",
+   "before_val": null,
+   "after_val": null,
+   "state": {
+    "app": "MiniERP",
+    "screen": "Invoice",
+    "record": {
+     "invoice_id": "4471",
+     "supplier": "Präzisionswerk Ulm",
+     "supplier_known": true,
+     "net_amount": 6350,
+     "currency": "EUR",
+     "invoice_date": "2026-09-14",
+     "invoice_month": 9,
+     "company_code": "DE01",
+     "category": "equipment",
+     "cost_center": "4711",
+     "approvals_count": 1
+    }
+   },
+   "confidence": 0.95,
+   "source": "dom",
+   "keyframe_id": null
+  },
+  {
+   "event_id": "se-04",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "t_ms": 22000,
+   "type": "field_changed",
+   "entity_kind": "invoice",
+   "entity_id": "4471",
+   "field": "cost_center",
+   "before_val": "4711",
+   "after_val": "0400",
+   "state": {
+    "app": "MiniERP",
+    "screen": "Invoice",
+    "record": {
+     "invoice_id": "4471",
+     "supplier": "Präzisionswerk Ulm",
+     "supplier_known": true,
+     "net_amount": 6350,
+     "currency": "EUR",
+     "invoice_date": "2026-09-14",
+     "invoice_month": 9,
+     "company_code": "DE01",
+     "category": "equipment",
+     "cost_center": "0400",
+     "approvals_count": 1
+    }
+   },
+   "confidence": 0.95,
+   "source": "dom",
+   "keyframe_id": "00000000-0000-4000-8000-000000000f02"
+  },
+  {
+   "event_id": "se-05",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "t_ms": 36000,
+   "type": "field_changed",
+   "entity_kind": "invoice",
+   "entity_id": "4471",
+   "field": "asset_number",
+   "before_val": "",
+   "after_val": "AN-2291",
+   "state": {
+    "app": "MiniERP",
+    "screen": "Invoice",
+    "record": {
+     "invoice_id": "4471",
+     "supplier": "Präzisionswerk Ulm",
+     "supplier_known": true,
+     "net_amount": 6350,
+     "currency": "EUR",
+     "invoice_date": "2026-09-14",
+     "invoice_month": 9,
+     "company_code": "DE01",
+     "category": "equipment",
+     "cost_center": "0400",
+     "approvals_count": 1,
+     "asset_number": "AN-2291"
+    }
+   },
+   "confidence": 0.95,
+   "source": "dom",
+   "keyframe_id": "00000000-0000-4000-8000-000000000f03"
+  },
+  {
+   "event_id": "se-06",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "t_ms": 42000,
+   "type": "button_clicked",
+   "entity_kind": "invoice",
+   "entity_id": "4471",
+   "field": "save",
+   "before_val": null,
+   "after_val": null,
+   "state": {
+    "app": "MiniERP",
+    "screen": "Invoice",
+    "record": {
+     "invoice_id": "4471",
+     "supplier": "Präzisionswerk Ulm",
+     "supplier_known": true,
+     "net_amount": 6350,
+     "currency": "EUR",
+     "invoice_date": "2026-09-14",
+     "invoice_month": 9,
+     "company_code": "DE01",
+     "category": "equipment",
+     "cost_center": "0400",
+     "approvals_count": 1,
+     "asset_number": "AN-2291"
+    }
+   },
+   "confidence": 0.95,
+   "source": "dom",
+   "keyframe_id": null
+  },
+  {
+   "event_id": "se-07",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "t_ms": 43000,
+   "type": "dialog",
+   "entity_kind": "invoice",
+   "entity_id": "4471",
+   "field": null,
+   "before_val": null,
+   "after_val": "Saved",
+   "state": {
+    "app": "MiniERP",
+    "screen": "Invoice"
+   },
+   "confidence": 0.95,
+   "source": "dom",
+   "keyframe_id": null
+  },
+  {
+   "event_id": "se-08",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "t_ms": 60000,
+   "type": "record_opened",
+   "entity_kind": "invoice",
+   "entity_id": "4480",
+   "field": null,
+   "before_val": null,
+   "after_val": null,
+   "state": {
+    "app": "MiniERP",
+    "screen": "Invoice",
+    "record": {
+     "invoice_id": "4480",
+     "supplier": "Kranbau GmbH",
+     "supplier_known": true,
+     "net_amount": 1980,
+     "currency": "EUR",
+     "invoice_date": "2026-12-03",
+     "invoice_month": 12,
+     "company_code": "DE01",
+     "category": "services",
+     "cost_center": "4711",
+     "approvals_count": 1
+    }
+   },
+   "confidence": 0.95,
+   "source": "dom",
+   "keyframe_id": "00000000-0000-4000-8000-000000000f04"
+  },
+  {
+   "event_id": "se-09",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "t_ms": 61000,
+   "type": "idle",
+   "entity_kind": "invoice",
+   "entity_id": "4480",
+   "field": null,
+   "before_val": null,
+   "after_val": null,
+   "state": {
+    "app": "MiniERP",
+    "screen": "Invoice"
+   },
+   "confidence": 0.95,
+   "source": "dom",
+   "keyframe_id": null
+  },
+  {
+   "event_id": "se-10",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "t_ms": 70000,
+   "type": "field_changed",
+   "entity_kind": "invoice",
+   "entity_id": "4480",
+   "field": "payment_status",
+   "before_val": "open",
+   "after_val": "on_hold",
+   "state": {
+    "app": "MiniERP",
+    "screen": "Invoice",
+    "record": {
+     "invoice_id": "4480",
+     "supplier": "Kranbau GmbH",
+     "supplier_known": true,
+     "net_amount": 1980,
+     "currency": "EUR",
+     "invoice_date": "2026-12-03",
+     "invoice_month": 12,
+     "company_code": "DE01",
+     "category": "services",
+     "cost_center": "4711",
+     "approvals_count": 1
+    }
+   },
+   "confidence": 0.95,
+   "source": "dom",
+   "keyframe_id": "00000000-0000-4000-8000-000000000f05"
+  },
+  {
+   "event_id": "se-11",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "t_ms": 80000,
+   "type": "button_clicked",
+   "entity_kind": "invoice",
+   "entity_id": "4480",
+   "field": "save",
+   "before_val": null,
+   "after_val": null,
+   "state": {
+    "app": "MiniERP",
+    "screen": "Invoice",
+    "record": {
+     "invoice_id": "4480",
+     "supplier": "Kranbau GmbH",
+     "supplier_known": true,
+     "net_amount": 1980,
+     "currency": "EUR",
+     "invoice_date": "2026-12-03",
+     "invoice_month": 12,
+     "company_code": "DE01",
+     "category": "services",
+     "cost_center": "4711",
+     "approvals_count": 1
+    }
+   },
+   "confidence": 0.95,
+   "source": "dom",
+   "keyframe_id": null
+  },
+  {
+   "event_id": "se-12",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "t_ms": 95000,
+   "type": "record_opened",
+   "entity_kind": "invoice",
+   "entity_id": "4492",
+   "field": null,
+   "before_val": null,
+   "after_val": null,
+   "state": {
+    "app": "MiniERP",
+    "screen": "Invoice",
+    "record": {
+     "invoice_id": "4492",
+     "supplier": "Strojírna Brno s.r.o.",
+     "supplier_known": true,
+     "net_amount": 3400,
+     "currency": "EUR",
+     "invoice_date": "2026-09-20",
+     "invoice_month": 9,
+     "company_code": "CZ01",
+     "category": "parts",
+     "cost_center": "4720",
+     "approvals_count": 1
+    }
+   },
+   "confidence": 0.95,
+   "source": "dom",
+   "keyframe_id": "00000000-0000-4000-8000-000000000f06"
+  },
+  {
+   "event_id": "se-13",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "t_ms": 104000,
+   "type": "button_clicked",
+   "entity_kind": "invoice",
+   "entity_id": "4492",
+   "field": "request_second_approval",
+   "before_val": null,
+   "after_val": null,
+   "state": {
+    "app": "MiniERP",
+    "screen": "Invoice",
+    "record": {
+     "invoice_id": "4492",
+     "supplier": "Strojírna Brno s.r.o.",
+     "supplier_known": true,
+     "net_amount": 3400,
+     "currency": "EUR",
+     "invoice_date": "2026-09-20",
+     "invoice_month": 9,
+     "company_code": "CZ01",
+     "category": "parts",
+     "cost_center": "4720",
+     "approvals_count": 1
+    }
+   },
+   "confidence": 0.95,
+   "source": "dom",
+   "keyframe_id": "00000000-0000-4000-8000-000000000f07"
+  },
+  {
+   "event_id": "se-14",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "t_ms": 130000,
+   "type": "field_changed",
+   "entity_kind": "invoice",
+   "entity_id": "4492",
+   "field": "note",
+   "before_val": "",
+   "after_val": "(off the record)",
+   "state": {
+    "app": "MiniERP",
+    "screen": "Invoice",
+    "record": {
+     "invoice_id": "4492",
+     "supplier": "Strojírna Brno s.r.o.",
+     "supplier_known": true,
+     "net_amount": 3400,
+     "currency": "EUR",
+     "invoice_date": "2026-09-20",
+     "invoice_month": 9,
+     "company_code": "CZ01",
+     "category": "parts",
+     "cost_center": "4720",
+     "approvals_count": 1
+    }
+   },
+   "confidence": 0.95,
+   "source": "dom",
+   "keyframe_id": null
+  },
+  {
+   "event_id": "se-15",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "t_ms": 140000,
+   "type": "button_clicked",
+   "entity_kind": "invoice",
+   "entity_id": "4492",
+   "field": "save",
+   "before_val": null,
+   "after_val": null,
+   "state": {
+    "app": "MiniERP",
+    "screen": "Invoice",
+    "record": {
+     "invoice_id": "4492",
+     "supplier": "Strojírna Brno s.r.o.",
+     "supplier_known": true,
+     "net_amount": 3400,
+     "currency": "EUR",
+     "invoice_date": "2026-09-20",
+     "invoice_month": 9,
+     "company_code": "CZ01",
+     "category": "parts",
+     "cost_center": "4720",
+     "approvals_count": 1
+    }
+   },
+   "confidence": 0.95,
+   "source": "dom",
+   "keyframe_id": null
+  },
+  {
+   "event_id": "se-16",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "t_ms": 141000,
+   "type": "typing_in_progress",
+   "entity_kind": "invoice",
+   "entity_id": "4492",
+   "field": null,
+   "before_val": null,
+   "after_val": null,
+   "state": {
+    "app": "MiniERP",
+    "screen": "Invoice"
+   },
+   "confidence": 0.4,
+   "source": "vision",
+   "keyframe_id": null
+  }
+ ],
+ "transcript_turns": [
+  {
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "turn_id": "tt-01",
+   "role": "user",
+   "text_redacted": "Okay, die erste Rechnung ist von Präzisionswerk Ulm, eine CNC-Vorrichtung für 6.350 Euro.",
+   "lang": "de",
+   "t_ms": 8000,
+   "off_record": false
+  },
+  {
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "turn_id": "tt-02",
+   "role": "user",
+   "text_redacted": "Den Lieferanten kenne ich, der ist in der Lieferantenliste.",
+   "lang": "de",
+   "t_ms": 16000,
+   "off_record": false
+  },
+  {
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "turn_id": "tt-03",
+   "role": "user",
+   "text_redacted": "Das ist eine Maschine über 5.000 Euro, das ist Anlagevermögen. Das geht immer auf 0400, nie auf 4711.",
+   "lang": "de",
+   "t_ms": 24000,
+   "off_record": false
+  },
+  {
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "turn_id": "tt-20",
+   "role": "agent",
+   "text_redacted": "Warum ändern Sie die Kostenstelle von 4711 auf 0400?",
+   "lang": "de",
+   "t_ms": 27000,
+   "off_record": false
+  },
+  {
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "turn_id": "tt-04",
+   "role": "user",
+   "text_redacted": "Alles, was Ausrüstung ist und über 5.000 Euro netto kostet, ist Capex. 4711 ist nur für laufende Kosten.",
+   "lang": "de",
+   "t_ms": 30000,
+   "off_record": false
+  },
+  {
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "turn_id": "tt-05",
+   "role": "user",
+   "text_redacted": "Und ohne Anlagennummer darf ich nicht auf 0400 buchen, das lehnt die Buchhaltung ab.",
+   "lang": "de",
+   "t_ms": 38000,
+   "off_record": false
+  },
+  {
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "turn_id": "tt-06",
+   "role": "user",
+   "text_redacted": "Kranbau, Dezember. Da muss ich aufpassen.",
+   "lang": "de",
+   "t_ms": 63000,
+   "off_record": false
+  },
+  {
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "turn_id": "tt-21",
+   "role": "agent",
+   "text_redacted": "Warum setzen Sie die Rechnung von Kranbau auf Halt?",
+   "lang": "de",
+   "t_ms": 72000,
+   "off_record": false
+  },
+  {
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "turn_id": "tt-07",
+   "role": "user",
+   "text_redacted": "Kranbau hat uns letztes Jahr im Dezember doppelt abgerechnet. Seitdem halte ich jede Dezemberrechnung von denen an und prüfe erst auf Duplikate.",
+   "lang": "de",
+   "t_ms": 75000,
+   "off_record": false
+  },
+  {
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "turn_id": "tt-08",
+   "role": "user",
+   "text_redacted": "Die ist von der tschechischen Tochter, CZ01.",
+   "lang": "de",
+   "t_ms": 98000,
+   "off_record": false
+  },
+  {
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "turn_id": "tt-22",
+   "role": "agent",
+   "text_redacted": "Gilt das für alle CZ-Rechnungen, unabhängig vom Betrag?",
+   "lang": "de",
+   "t_ms": 106000,
+   "off_record": false
+  },
+  {
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "turn_id": "tt-09",
+   "role": "user",
+   "text_redacted": "Ja, bei CZ01 brauchen wir immer eine zweite Freigabe, egal wie hoch der Betrag ist.",
+   "lang": "de",
+   "t_ms": 110000,
+   "off_record": false
+  },
+  {
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "turn_id": "tt-10",
+   "role": "user",
+   "text_redacted": "Wenn ich einen Lieferanten nicht kenne, frage ich immer erst den Controller, bevor ich irgendwas buche.",
+   "lang": "de",
+   "t_ms": 120000,
+   "off_record": false
+  },
+  {
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "turn_id": "tt-11",
+   "role": "user",
+   "text_redacted": "Ganz unter uns: der Einkauf ist bei Kranbau viel zu nachsichtig.",
+   "lang": "de",
+   "t_ms": 128000,
+   "off_record": true
+  },
+  {
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "turn_id": "tt-12",
+   "role": "user",
+   "text_redacted": "Und der Kollege aus dem Einkauf kriegt das auch nie mit.",
+   "lang": "de",
+   "t_ms": 133000,
+   "off_record": false
+  },
+  {
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "turn_id": "tt-13",
+   "role": "user",
+   "text_redacted": "So, das waren die drei.",
+   "lang": "de",
+   "t_ms": 142000,
+   "off_record": false
+  }
+ ],
+ "off_record_spans": [
+  {
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "start_t_ms": 125000,
+   "end_t_ms": 135000
+  }
+ ],
+ "questions": [
+  {
+   "id": "q-01",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "phase": "capture",
+   "qtype": "why",
+   "text": "Warum ändern Sie die Kostenstelle von 4711 auf 0400?",
+   "anchor_event_ids": [
+    "se-04"
+   ],
+   "status": "answered",
+   "created_t_ms": 25000,
+   "asked_t_ms": 27000
+  },
+  {
+   "id": "q-02",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "phase": "capture",
+   "qtype": "exception",
+   "text": "Warum setzen Sie die Rechnung von Kranbau auf Halt?",
+   "anchor_event_ids": [
+    "se-10"
+   ],
+   "status": "answered",
+   "created_t_ms": 71000,
+   "asked_t_ms": 72000
+  },
+  {
+   "id": "q-03",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "phase": "capture",
+   "qtype": "limit",
+   "text": "Gilt das für alle CZ-Rechnungen, unabhängig vom Betrag?",
+   "anchor_event_ids": [
+    "se-13"
+   ],
+   "status": "answered",
+   "created_t_ms": 105000,
+   "asked_t_ms": 106000
+  },
+  {
+   "id": "q-04",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "phase": "capture",
+   "qtype": "stop_and_ask",
+   "text": "Was machen Sie, wenn die Anlagennummer noch nicht vergeben ist?",
+   "anchor_event_ids": [
+    "se-05"
+   ],
+   "status": "expired",
+   "created_t_ms": 39000,
+   "asked_t_ms": null
+  },
+  {
+   "id": "q-05",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "phase": "capture",
+   "qtype": "other",
+   "text": "Wer ist der Controller, den Sie bei unbekannten Lieferanten fragen?",
+   "anchor_event_ids": [],
+   "status": "candidate",
+   "created_t_ms": 121000,
+   "asked_t_ms": null
+  }
+ ],
+ "answers": [
+  {
+   "id": "a-01",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "question_id": "q-01",
+   "turn_ids": [
+    "tt-04"
+   ],
+   "content_class": "reason_and_guardrail",
+   "quote": "Alles, was Ausrüstung ist und über 5.000 Euro netto kostet, ist Capex.",
+   "quote_en": "Anything that is equipment and costs over €5,000 net is capex.",
+   "has_condition": true,
+   "extracted_rule": "category == equipment and net_amount > 5000 → cost_center 0400"
+  },
+  {
+   "id": "a-02",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "question_id": "q-02",
+   "turn_ids": [
+    "tt-07"
+   ],
+   "content_class": "reason_and_guardrail",
+   "quote": "Seitdem halte ich jede Dezemberrechnung von denen an und prüfe erst auf Duplikate.",
+   "quote_en": "Since then I hold every December invoice from them and check for duplicates first.",
+   "has_condition": true,
+   "extracted_rule": "supplier == Kranbau GmbH and invoice_month == 12 → hold"
+  },
+  {
+   "id": "a-03",
+   "session_id": "00000000-0000-4000-8000-00000000d001",
+   "question_id": "q-03",
+   "turn_ids": [
+    "tt-09"
+   ],
+   "content_class": "guardrail_only",
+   "quote": "Ja, bei CZ01 brauchen wir immer eine zweite Freigabe, egal wie hoch der Betrag ist.",
+   "quote_en": "Yes, CZ01 always needs a second approval, whatever the amount.",
+   "has_condition": true,
+   "extracted_rule": "company_code starts with CZ → second approval"
+  }
+ ],
+ "open_items": [
+  {
+   "id": "00000000-0000-4000-8000-0000000001a1",
+   "org_id": "00000000-0000-4000-8000-00000000a001",
+   "workflow_id": "00000000-0000-4000-8000-00000000b001",
+   "work_map_id": null,
+   "session_id": "00000000-0000-4000-8000-00000000d000",
+   "text": "Ab welchem Betrag braucht eine DE01-Rechnung eine zweite Freigabe?",
+   "anchor_t_ms": null,
+   "origin": "live",
+   "status": "open",
+   "importance": 2
+  },
+  {
+   "id": "00000000-0000-4000-8000-0000000001a2",
+   "org_id": "00000000-0000-4000-8000-00000000a001",
+   "workflow_id": "00000000-0000-4000-8000-00000000b001",
+   "work_map_id": null,
+   "session_id": "00000000-0000-4000-8000-00000000d000",
+   "text": "Resolved earlier: which cost center is office supplies?",
+   "anchor_t_ms": null,
+   "origin": "builder",
+   "status": "resolved",
+   "importance": 1
+  },
+  {
+   "id": "00000000-0000-4000-8000-0000000001a3",
+   "org_id": "00000000-0000-4000-8000-00000000a001",
+   "workflow_id": "00000000-0000-4000-8000-00000000b001",
+   "work_map_id": null,
+   "session_id": "00000000-0000-4000-8000-00000000d009",
+   "text": "Another expert's open item; must not carry over.",
+   "anchor_t_ms": null,
+   "origin": "live",
+   "status": "open",
+   "importance": 3
+  }
+ ],
+ "work_maps": []
+}

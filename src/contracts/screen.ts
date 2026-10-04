@@ -1,4 +1,4 @@
-// TEMPORARY: replace with @sidekik/contracts (see ./README.md). DomEvent is here only for the bus schema map.
+// TEMPORARY: replace with @sidekik/contracts (see ./README.md).
 import { z } from 'zod';
 
 export const InvoiceStateSchema = z.object({
@@ -26,3 +26,40 @@ export const DomEventSchema = z.object({
   state: InvoiceStateSchema.optional(),
 });
 export type DomEvent = z.infer<typeof DomEventSchema>;
+
+// ARCHITECTURE Appendix B. Not on the gateway's copy: the gateway never reads screen events.
+export const ScreenStateSchema = z.object({
+  app: z.string().optional(),
+  screen: z.string().optional(),
+  record: InvoiceStateSchema.optional(),
+  focused_field: z.string().optional(),
+});
+export type ScreenState = z.infer<typeof ScreenStateSchema>;
+
+export const ScreenEventTypeSchema = z.enum([
+  'app_opened',
+  'record_opened',
+  'field_changed',
+  'button_clicked',
+  'value_read',
+  'navigation',
+  'dialog',
+  'typing_in_progress',
+  'idle',
+]);
+export type ScreenEventType = z.infer<typeof ScreenEventTypeSchema>;
+
+export const ScreenEventSchema = z.object({
+  event_id: z.string(),
+  type: ScreenEventTypeSchema,
+  entity: z.object({ kind: z.string(), id: z.string() }).optional(),
+  field: z.string().optional(),
+  before: z.string().optional(),
+  after: z.string().optional(),
+  state: ScreenStateSchema,
+  confidence: z.number(),
+  source: z.enum(['vision', 'dom']),
+  keyframe_id: z.string().optional(),
+  untrusted_screen_text: z.string().optional(),
+});
+export type ScreenEvent = z.infer<typeof ScreenEventSchema>;
