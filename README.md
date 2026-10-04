@@ -67,6 +67,8 @@ pnpm dev:replay dev/fixtures/debrief_sabine.jsonl                     # 3 follow
 # or debrief_sabine_correction.jsonl: Sabine corrects the teach-back, hears it restated, confirms
 curl -X POST localhost:8083/internal/workmaps/<id>/publish \
   -H 'x-internal-token: dev-mock-secret-not-for-production-0000000000'   # id from "work map confirmed"; files in dev/out/
+curl -OJ localhost:8083/internal/workmaps/<id>/export \
+  -H 'x-internal-token: dev-mock-secret-not-for-production-0000000000'   # the agent-rules zip
 curl -X POST localhost:8083/internal/tools/recall_context -H 'content-type: application/json' \
   -H 'x-internal-token: dev-mock-secret-not-for-production-0000000000' \
   -d '{"session_id":"00000000-0000-4000-8000-00000000d001","query":"Kranbau Dezember","scope":"workflow"}'
@@ -106,6 +108,8 @@ Publish (`src/publish/`), DESIGN §6: `POST /internal/workmaps/:id/publish` (gat
 3. **Search:** replaces the map's `kb_chunks`: one per step, guardrail and brain answer, original language plus English.
 4. **Storage:** `workmap.json`, `AGENT_RULES.md` and `guardrails.jsonlogic.json` under `workmaps/org/{org}/{id}/v{n}/`.
 5. **Announce:** status `published` with `published_at`, then `sk:workmap.published {workmap_id, workflow_id, version}` (voice loads the map from Storage, tutor from the database).
+
+Export (`src/publish/export.ts`): `GET /internal/workmaps/:id/export?format=agent` (gateway relays `GET /v1/workmaps/:id/export`) downloads `<title>-v<n>-agent-rules.zip` with `AGENT_RULES.md` and `guardrails.jsonlogic.json`, rendered exactly as publish writes them. Offered once the expert has confirmed the map (`confirmed` or `published`), 409 before that.
 
 `recall_context` (`src/recall/`), the interviewer's webhook tool through the gateway (`POST /internal/tools/recall_context {session_id, query, scope}`, 1 s budget) → `{snippets: [{text, t_ms, source}]}`, at most 5:
 
