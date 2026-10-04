@@ -1,3 +1,4 @@
+import { overlap, words } from '../recall/words.js';
 import {
   VersionConflictError,
   type AnswerRow,
@@ -115,6 +116,16 @@ export function memoryStore(seed: Partial<MemoryData> = {}): Store & { data: Mem
     },
     async getExpertMemory(expertId, workflowId) {
       return data.expert_memory.find((m) => m.expert_id === expertId && m.workflow_id === workflowId) ?? null;
+    },
+    // Word overlap stands in for Postgres full-text search here.
+    async searchKb(orgId, workflowId, query, limit) {
+      const q = words(query);
+      return data.kb_chunks
+        .filter((c) => c.org_id === orgId && c.workflow_id === workflowId)
+        .map((c) => ({ id: c.id, kind: c.kind, ref_id: c.ref_id, content: c.content, score: overlap(q, c.content) }))
+        .filter((h) => h.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
     },
     async replaceKbChunks(workMapId, rows) {
       data.kb_chunks = [...data.kb_chunks.filter((c) => c.work_map_id !== workMapId), ...structuredClone(rows)];

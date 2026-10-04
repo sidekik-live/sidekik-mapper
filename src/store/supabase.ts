@@ -4,6 +4,7 @@ import {
   type AnswerRow,
   type ExpertMemoryRow,
   type ExpertRow,
+  type KbHit,
   type OffRecordSpanRow,
   type OpenItemRow,
   type QuestionRow,
@@ -171,6 +172,11 @@ export function supabaseStore(db: SupabaseClient): Store {
       // Not atomic: a failure between the two leaves the map unsearchable until publish runs again.
       unwrap(await db.from('kb_chunks').delete().eq('work_map_id', workMapId), 'delete kb chunks');
       if (rows.length > 0) unwrap(await db.from('kb_chunks').insert(rows), 'insert kb chunks');
+    },
+
+    async searchKb(orgId, workflowId, query, limit) {
+      const res = await db.rpc('search_kb', { p_org: orgId, p_workflow: workflowId, p_query: query, p_limit: limit });
+      return unwrap<KbHit[] | null>(res, 'search kb') ?? [];
     },
   };
 }

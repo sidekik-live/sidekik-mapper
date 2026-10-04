@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { HttpError, notFound } from '../errors.js';
 import { PUBLISHABLE } from '../publish/publish-job.js';
+import { recallContext } from '../recall/recall.js';
 import type { JobFn, JobRunner } from '../services/jobs.js';
 import type { Store } from '../store/types.js';
 
@@ -38,6 +39,30 @@ export const internalRoutes: FastifyPluginAsync<InternalRoutesOptions> = async (
       );
       request.log.info({ job_id: job.id, deduped }, deduped ? 'publish already running' : 'publish queued');
       return reply.code(202).send({ job_id: job.id });
+    },
+  );
+
+  // ElevenLabs webhook tool, through the gateway's /v1/tools/recall_context (1 s budget).
+  app.post(
+    '/internal/tools/recall_context',
+    {
+      onRequest: app.requireInternal,
+      schema: {
+        body: z
+          .object({
+            session_id: z.string().min(1),
+            query: z.string().trim().min(1),
+            scope: z.enum(['session', 'workflow']).default('session'),
+          })
+          .passthrough(),
+      },
+    },
+    async (request) => {
+      const { session_id, query, scope } = request.body;
+      const session = await opts.store.getSession(session_id);
+      if (!session) throw notFound('Session not found');
+      request.log = request.log.child({ session_id: session.id, org_id: session.org_id });
+      return recallContext({ store: opts.store }, { session, query, scope }, request.log);
     },
   );
 };
