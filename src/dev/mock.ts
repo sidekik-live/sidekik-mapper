@@ -14,6 +14,7 @@ import { claudeDrafter } from '../build/drafter.js';
 import { D6_HAS_GAPS, stubDecider, type Decider } from '../clients/brain.js';
 import { stubGateway } from '../clients/gateway.js';
 import { stubPerception } from '../clients/perception.js';
+import { claudeComparator, structuralComparator } from '../compare/compare.js';
 import { createBus } from '../contracts/index.js';
 import { loadEnv } from '../env.js';
 import { plainYes } from '../debrief/driver.js';
@@ -84,6 +85,7 @@ app = await buildApp({
       : { write: async (workmap) => templateTeachback(workmap) },
   }),
   store,
+  comparator: useClaude ? claudeComparator({ apiKey: env.ANTHROPIC_API_KEY, model: env.PATCH_MODEL }) : structuralComparator,
   publish: createPublishJob({
     store,
     bus,

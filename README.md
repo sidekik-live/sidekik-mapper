@@ -120,6 +120,8 @@ Export (`src/publish/export.ts`): `GET /internal/workmaps/:id/export?format=agen
 - Both: the session's last 20 screen events that match the query (an opened record carries its supplier, amount, category, company code, cost center and month).
 - Ranked together, best first; if nothing matches, the 2 newest screen events. Nothing from an off-record span is ever returned.
 
+Compare two experts (`src/compare/`, DESIGN §7, stretch): `POST /internal/workflows/:id/compare {workmap_a, workmap_b}` aligns the two confirmed maps' steps by screen signature (app, record kind, field), has Sonnet (`PATCH_MODEL`) report the differences in substance (a decision, value, threshold or rule, not wording), and turns each into an open item for both experts, naming the other ("Jürgen codes this 0410, you code it 0400. Why?"), on their map and session so their next debrief asks it. Comparing again adds nothing twice. Without `ANTHROPIC_API_KEY` (dev:mock) a structural comparison finds steps only one expert does and rules that differ.
+
 ## Roadmap
 
 One PR per ticket from `docs/DESIGN.md` §9. Each PR leaves the service booting with typecheck and tests green.

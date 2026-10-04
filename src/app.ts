@@ -23,6 +23,7 @@ export type AppDeps = {
   handlers: Handlers;
   store: InternalRoutesOptions['store'];
   publish: InternalRoutesOptions['publish'];
+  comparator: InternalRoutesOptions['comparator'];
   healthChecks: Record<string, HealthCheck>;
   /** Defaults to a runner logging through the app's logger. */
   jobs?: JobRunner;
@@ -91,7 +92,7 @@ export async function buildApp(deps: AppDeps) {
   });
 
   await app.register(healthRoutes, { version: VERSION, checks: deps.healthChecks });
-  await app.register(internalRoutes, { store: deps.store, jobs, publish: deps.publish });
+  await app.register(internalRoutes, { store: deps.store, jobs, publish: deps.publish, comparator: deps.comparator, bus: deps.bus });
 
   return app;
 }
