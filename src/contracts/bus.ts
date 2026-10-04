@@ -1,5 +1,5 @@
 // TEMPORARY: replace with @sidekik/contracts (see ./README.md).
-// Implements sidekik-platform docs/DESIGN.md §3: XADD MAXLEN ~ 10000; XREADGROUP + XACK,
+// Implements sidekik-platform docs/DESIGN.md §3: XADD MAXLEN ~ 10000 with the envelope in field "ev"; XREADGROUP + XACK,
 // 3 attempts then dead-letter to "sk:dlq"; invalid events are logged and acked, never retried.
 import { hostname } from 'node:os';
 import { Redis } from 'ioredis';
@@ -13,6 +13,8 @@ import { SpeechSignalSchema, TranscriptTurnSchema } from './transcript.js';
 import { UsageRecordSchema } from './usage.js';
 
 export const DLQ_STREAM = 'sk:dlq';
+/** Stream entry field holding the JSON envelope; sidekik-platform's bus.ts uses "ev". */
+const FIELD = 'ev';
 
 const EnvelopeSchema = z.object({
   id: z.string(),
@@ -85,7 +87,7 @@ export function createBus(
     };
 
     const handleEntry = async (entryId: string, fields: string[]) => {
-      const raw = fields[fields.indexOf('data') + 1];
+      const raw = fields[fields.indexOf(FIELD) + 1];
       let ev: Envelope<T>;
       try {
         const envelope = EnvelopeSchema.parse(JSON.parse(raw ?? ''));
@@ -106,7 +108,7 @@ export function createBus(
           if (attempt >= MAX_ATTEMPTS) {
             log.error({ ...ctx, err: errMessage(err) }, 'bus handler failed; sent to dead-letter queue');
             await conn.xadd(DLQ_STREAM, 'MAXLEN', '~', 10000, '*', 'stream', stream, 'group', group,
-              'error', errMessage(err), 'data', raw ?? '');
+              'error', errMessage(err), FIELD, raw ?? '');
             break;
           }
           log.warn({ ...ctx, err: errMessage(err) }, 'bus handler failed; retrying');
@@ -153,7 +155,7 @@ export function createBus(
   return {
     redis,
     async publish(stream, ev) {
-      const id = await redis.xadd(stream, 'MAXLEN', '~', 10000, '*', 'data', JSON.stringify(ev));
+      const id = await redis.xadd(stream, 'MAXLEN', '~', 10000, '*', FIELD, JSON.stringify(ev));
       if (!id) throw new Error(`XADD to ${stream} returned no id`);
       return id;
     },

@@ -1,6 +1,7 @@
 import {
   VersionConflictError,
   type AnswerRow,
+  type ExpertMemoryRow,
   type ExpertRow,
   type OffRecordSpanRow,
   type OpenItemRow,
@@ -24,6 +25,7 @@ export type MemoryData = {
   answers: AnswerRow[];
   open_items: OpenItemRow[];
   work_maps: WorkMapRow[];
+  expert_memory: ExpertMemoryRow[];
 };
 
 /** In-memory store for tests and `pnpm dev:mock`; `data` is exposed so callers can inspect writes. */
@@ -39,6 +41,7 @@ export function memoryStore(seed: Partial<MemoryData> = {}): Store & { data: Mem
     answers: [],
     open_items: [],
     work_maps: [],
+    expert_memory: [],
     ...structuredClone(seed),
   };
   const bySession = <T extends { session_id: string | null }>(rows: T[], sessionId: string) =>
@@ -88,6 +91,20 @@ export function memoryStore(seed: Partial<MemoryData> = {}): Store & { data: Mem
       }
       data.work_maps.push(structuredClone(row));
       data.open_items.push(...structuredClone(openItems));
+    },
+    async updateWorkMap(id, patch) {
+      const row = data.work_maps.find((m) => m.id === id);
+      if (!row) throw new Error(`work map ${id} not found`);
+      Object.assign(row, structuredClone(patch));
+    },
+    async listOpenItems(workMapId) {
+      return structuredClone(data.open_items.filter((o) => o.work_map_id === workMapId)).sort((a, b) => b.importance - a.importance);
+    },
+    async replaceOpenItems(workMapId, rows) {
+      data.open_items = [...data.open_items.filter((o) => o.work_map_id !== workMapId), ...structuredClone(rows)];
+    },
+    async getExpertMemory(expertId, workflowId) {
+      return data.expert_memory.find((m) => m.expert_id === expertId && m.workflow_id === workflowId) ?? null;
     },
   };
 }

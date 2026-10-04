@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   VersionConflictError,
   type AnswerRow,
+  type ExpertMemoryRow,
   type ExpertRow,
   type OffRecordSpanRow,
   type OpenItemRow,
@@ -125,6 +126,36 @@ export function supabaseStore(db: SupabaseClient): Store {
       if (error?.code === '23505') throw new VersionConflictError(row.workflow_id, row.version);
       if (error) throw new Error(`insert work map: ${error.message}`);
       if (openItems.length > 0) unwrap(await db.from('open_items').insert(openItems), 'insert open items');
+    },
+
+    async updateWorkMap(id, patch) {
+      unwrap(await db.from('work_maps').update(patch).eq('id', id), 'update work map');
+    },
+
+    async listOpenItems(workMapId) {
+      const res = await db
+        .from('open_items')
+        .select(OPEN_ITEM_COLUMNS)
+        .eq('work_map_id', workMapId)
+        .order('importance', { ascending: false });
+      return unwrap<OpenItemRow[]>(res, 'load open items');
+    },
+
+    async replaceOpenItems(workMapId, rows) {
+      // Not atomic: a failure between the two leaves the map with no open items, and the
+      // build retry (task_done redelivery) rewrites them from the Work Map JSON.
+      unwrap(await db.from('open_items').delete().eq('work_map_id', workMapId), 'delete open items');
+      if (rows.length > 0) unwrap(await db.from('open_items').insert(rows), 'insert open items');
+    },
+
+    async getExpertMemory(expertId, workflowId) {
+      const res = await db
+        .from('expert_memory')
+        .select('expert_id, workflow_id, summary')
+        .eq('expert_id', expertId)
+        .eq('workflow_id', workflowId)
+        .maybeSingle();
+      return unwrap<ExpertMemoryRow | null>(res, 'load expert memory');
     },
   };
 }

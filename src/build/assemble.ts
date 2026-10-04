@@ -7,6 +7,10 @@ import { mmss } from './prompt.js';
 
 const IMPORTANCE = { high: 3, medium: 2, low: 1 } as const;
 
+/** "Sabine · 03:12": who said it and when, for the UI next to a quote. */
+export const sourceLabel = (expert: string, t_ms: number | undefined) =>
+  t_ms === undefined ? expert : `${expert} · ${mmss(t_ms)}`;
+
 export type Assembled = {
   workmap: WorkMap;
   /** Rows for `open_items`, in the Work Map's order, carrying importance (not part of the contract type). */
@@ -69,7 +73,7 @@ export function assembleWorkMap(args: {
         quote: s.reason.quote,
         quote_en: s.reason.quote_en,
         turn_id: s.reason.turn_id,
-        source_label: reasonTime === undefined ? expert : `${expert} · ${mmss(reasonTime)}`,
+        source_label: sourceLabel(expert, reasonTime),
       },
       guardrail_ids: s.guardrail_keys.flatMap((key) => {
         const id = guardrailIds.get(key);
