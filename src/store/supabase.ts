@@ -131,6 +131,24 @@ export function supabaseStore(db: SupabaseClient): Store {
       unwrap(await db.from('work_maps').update(patch).eq('id', id), 'update work map');
     },
 
+    async retireOtherVersions(workflowId, keepId) {
+      const published = unwrap<WorkMapRow[]>(
+        await db.from('work_maps').select(WORK_MAP_COLUMNS).eq('workflow_id', workflowId).eq('status', 'published').neq('id', keepId),
+        'load published work maps',
+      );
+      for (const m of published) {
+        unwrap(
+          await db.from('work_maps').update({ status: 'retired', json: { ...m.json, status: 'retired' } }).eq('id', m.id),
+          'retire work map',
+        );
+      }
+      unwrap(
+        await db.from('kb_chunks').delete().eq('workflow_id', workflowId).neq('work_map_id', keepId),
+        'delete retired kb chunks',
+      );
+      return published.map((m) => m.id);
+    },
+
     async listOpenItems(workMapId) {
       const res = await db
         .from('open_items')

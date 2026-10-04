@@ -1,5 +1,5 @@
 import type { FastifyBaseLogger } from 'fastify';
-import { ulid } from 'ulid';
+import { newId } from '../contracts/index.js';
 
 export type JobKind = 'build' | 'publish';
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
@@ -51,7 +51,7 @@ export class JobRunner {
     const existing = this.active.get(activeKey);
     if (existing) return { job: existing, deduped: true };
 
-    const job: Job = { ...ctx, id: ulid(), kind, key, status: 'queued', created_at: new Date().toISOString() };
+    const job: Job = { ...ctx, id: newId(), kind, key, status: 'queued', created_at: new Date().toISOString() };
     this.jobs.set(job.id, job);
     this.active.set(activeKey, job);
     this.trim();

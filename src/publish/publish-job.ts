@@ -1,6 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify';
 import type { PerceptionClient } from '../clients/perception.js';
-import { makeEvent, STREAMS, type Bus, type WorkMap, type WorkMapPublished } from '../contracts/index.js';
+import { makeEvent, STREAMS, WorkMapSchema, type Bus, type WorkMap, type WorkMapPublished } from '../contracts/index.js';
 import { runDemoCases, type DemoResult } from '../guardrails/demo-cases.js';
 import { updateExpertMemory } from '../memory/expert-memory.js';
 import { checkRule } from '../guardrails/rules.js';
@@ -44,6 +44,12 @@ export function createPublishJob(deps: PublishDeps) {
       throw new Error(`work map ${workmapId} is ${row.status}; only a confirmed map can be published`);
     }
     const workmap: WorkMap = { ...row.json, status: 'published' };
+    // Voice and tutor parse the published map with the contract's schema; never publish one they can't.
+    const contract = WorkMapSchema.safeParse(workmap);
+    if (!contract.success) {
+      const issues = contract.error.issues.slice(0, 5).map((i) => `${i.path.join('.')}: ${i.message}`);
+      throw new Error(`work map does not match the WorkMap contract: ${issues.join('; ')}`);
+    }
 
     // 1. Compile and test the guardrails. A rule that doesn't evaluate must never reach tutor.
     const broken = workmap.guardrails.flatMap((g) => checkRule(g.rule).map((p) => `${g.key}: ${p}`));
@@ -87,6 +93,9 @@ export function createPublishJob(deps: PublishDeps) {
 
     // 6. Published, then announced.
     await deps.store.updateWorkMap(row.id, { status: 'published', json: workmap, published_at: new Date().toISOString() });
+    // The previous published version retires, and its chunks stop answering recall_context.
+    const retired = await deps.store.retireOtherVersions(row.workflow_id, row.id);
+    if (retired.length > 0) log.info({ retired }, 'previous work map versions retired');
     await deps.bus.publish(
       STREAMS.workmapPublished,
       makeEvent<WorkMapPublished>({

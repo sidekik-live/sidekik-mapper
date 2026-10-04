@@ -26,7 +26,9 @@ The full spec is in `docs/DESIGN.md`. System design and contracts are in `docs/A
 
 ## Stack
 
-Node 20, TypeScript (strict), Fastify, zod, pino, vitest, pnpm, `json-logic-js`, the Anthropic SDK, and Docker (`node:20-slim`). Contracts come from `@sidekik/contracts`, pinned to a `sidekik-platform` git tag.
+Node 22, TypeScript (strict), Fastify, zod 4, pino 10, vitest, pnpm 10, `json-logic-js`, the Anthropic SDK, and Docker (`node:22-slim`). Every payload type, stream name and the Redis Streams bus come from `@sidekik/contracts`, pinned to the `sidekik-platform` tag `v0.1.0` (`src/contracts/index.ts` re-exports it).
+
+Use pnpm 10 (`packageManager` pins 10.34.6; with corepack or pnpm ≥ 9.7 it switches automatically). pnpm 9 installs the git dependency under a directory name containing `#`, which Vite (and so vitest) cannot load.
 
 ## Setup
 

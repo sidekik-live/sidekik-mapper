@@ -29,4 +29,11 @@ describe('claudeUsageRecords', () => {
     expect(priced).toBe(false);
     expect(records.map((r) => r.cost_usd)).toEqual([0, 0]);
   });
+
+  it("takes rates from the platform's PRICE_TABLE, and fallback models from its own table", () => {
+    const haiku = claudeUsageRecords({ model: 'claude-haiku-4-5', input_tokens: 1_000_000, output_tokens: 1_000_000, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 });
+    expect(haiku.records.map((r) => r.cost_usd)).toEqual([1, 5]);
+    const opus = claudeUsageRecords({ model: 'claude-opus-4-8', input_tokens: 1_000_000, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 });
+    expect(opus).toMatchObject({ priced: true, records: [{ cost_usd: 5 }, { cost_usd: 0 }] });
+  });
 });

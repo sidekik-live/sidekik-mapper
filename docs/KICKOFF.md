@@ -71,7 +71,7 @@ Post the issue in the team chat. Sahil bumps the tag, and every affected owner u
 ## 6. Deploy (once the team has picked hosting)
 
 ```
-Add a production Dockerfile (node:20-slim), a /healthz that reports dependency status,
+Add a production Dockerfile (node:22-slim), a /healthz that reports dependency status,
 listen on host "::" and PORT from env, and a README section "Deploy" listing every env var from .env.example.
 ```
 

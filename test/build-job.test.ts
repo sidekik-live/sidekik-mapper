@@ -100,11 +100,14 @@ describe('build job', () => {
     expect(store.data.work_maps.find((m) => m.session_id === SABINE.session)!.version).toBe(4);
   });
 
-  it('skips replay sessions and fails clearly on a session it cannot find', async () => {
+  it('skips replay sessions and sessions it cannot find', async () => {
     const { store, build } = setup();
     store.data.sessions[0]!.mode = 'replay';
     expect(await build(taskDone(), silentLog())).toMatchObject({ status: 'skipped' });
-    await expect(build(taskDone('00000000-0000-4000-8000-0000000000ff'), silentLog())).rejects.toThrow(/not found/);
+    expect(await build(taskDone('00000000-0000-4000-8000-0000000000ff'), silentLog())).toEqual({
+      status: 'skipped',
+      reason: 'session 00000000-0000-4000-8000-0000000000ff not found',
+    });
   });
 
   it('refuses to draft from a session with nothing on record', async () => {

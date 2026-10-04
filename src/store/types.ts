@@ -1,4 +1,6 @@
-import type { ScreenEventType, ScreenState, WorkMap, WorkMapStatus } from '../contracts/index.js';
+import type { ScreenEventType, ScreenState, WorkMap } from '../contracts/index.js';
+
+export type WorkMapStatus = WorkMap['status'];
 
 // Rows as SCHEMA.md defines them; only the columns the mapper reads or writes.
 
@@ -95,6 +97,7 @@ export type WorkMapRow = {
   status: WorkMapStatus;
   language: string;
   json: WorkMap;
+  confirmed_turn_id?: string | null;
   published_at?: string | null;
 };
 
@@ -194,7 +197,13 @@ export interface Store {
   latestWorkMapVersion(workflowId: string): Promise<number>;
   /** Inserts the Work Map, then its open items. Throws VersionConflictError on a duplicate version. */
   insertWorkMap(row: WorkMapRow, openItems: OpenItemRow[]): Promise<void>;
-  updateWorkMap(id: string, patch: Pick<WorkMapRow, 'status' | 'json' | 'published_at'>): Promise<void>;
+  updateWorkMap(id: string, patch: Pick<WorkMapRow, 'status' | 'json' | 'confirmed_turn_id' | 'published_at'>): Promise<void>;
+  /**
+   * After `keepId` is published: retires the workflow's other published maps and removes their
+   * search chunks, so search_kb() (which filters by workflow) only finds the current map.
+   * Returns the ids it retired.
+   */
+  retireOtherVersions(workflowId: string, keepId: string): Promise<string[]>;
   /** The Work Map's open items, most important first. */
   listOpenItems(workMapId: string): Promise<OpenItemRow[]>;
   updateOpenItemStatus(id: string, status: OpenItemRow['status']): Promise<void>;

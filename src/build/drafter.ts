@@ -53,6 +53,9 @@ export function claudeDrafter(opts: ClaudeDrafterOptions): Drafter {
 export function parseDraft(text: string): Parsed<WorkMapDraft> {
   const parsed = parseJson(text, WorkMapDraftSchema);
   if (!parsed.ok) return parsed;
+  // The contract's StepSchema requires a title; voice and tutor parse the published map with it.
+  const untitled = parsed.value.steps.find((s) => s.title.trim() === '' || s.decision.trim() === '');
+  if (untitled) return { ok: false, problem: `Step ${untitled.key} has an empty title or decision.` };
   const badRule = parsed.value.guardrails.find((g) => !isJsonObject(g.rule_json));
   if (badRule) return { ok: false, problem: `Guardrail ${badRule.key} has a rule_json that is not a JSON object.` };
   return parsed;

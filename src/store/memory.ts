@@ -115,6 +115,15 @@ export function memoryStore(seed: Partial<MemoryData> = {}): Store & { data: Mem
       if (!row) throw new Error(`work map ${id} not found`);
       Object.assign(row, structuredClone(patch));
     },
+    async retireOtherVersions(workflowId, keepId) {
+      const retired = data.work_maps.filter((m) => m.workflow_id === workflowId && m.id !== keepId && m.status === 'published');
+      for (const m of retired) {
+        m.status = 'retired';
+        m.json = { ...m.json, status: 'retired' };
+      }
+      data.kb_chunks = data.kb_chunks.filter((c) => c.workflow_id !== workflowId || c.work_map_id === keepId);
+      return retired.map((m) => m.id);
+    },
     async listOpenItems(workMapId) {
       return structuredClone(data.open_items.filter((o) => o.work_map_id === workMapId)).sort((a, b) => b.importance - a.importance);
     },

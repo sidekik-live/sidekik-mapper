@@ -6,10 +6,12 @@ import { httpPerception } from './clients/perception.js';
 import { claudeComparator } from './compare/compare.js';
 import { createBus } from './contracts/index.js';
 import { loadEnv } from './env.js';
+import { createServiceLogger } from './logger.js';
 import { claudeAnswerPatcher, claudeCorrectionPatcher } from './debrief/patch.js';
 import { claudeTeachbackWriter } from './debrief/teachback.js';
 import { createHandlers } from './handlers.js';
 import { createPublishJob } from './publish/publish-job.js';
+import { redisHealth } from './redis-health.js';
 import { supabaseArtifacts } from './store/artifacts.js';
 import { supabaseStore } from './store/supabase.js';
 import { createSupabase, supabaseHealth } from './supabase.js';
@@ -17,15 +19,11 @@ import { createSupabase, supabaseHealth } from './supabase.js';
 const env = loadEnv();
 const supabase = createSupabase(env);
 const store = supabaseStore(supabase);
-const pretty = process.env.NODE_ENV !== 'production' && process.stdout.isTTY;
+const log = createServiceLogger(env.LOG_LEVEL);
+const bus = createBus(env.REDIS_URL, 'mapper', { logger: log.child({ component: 'bus' }) });
+const redis = redisHealth(env.REDIS_URL, log);
 
-let app: Awaited<ReturnType<typeof buildApp>>;
-const bus = createBus(env.REDIS_URL, 'mapper', {
-  warn: (obj, msg) => app.log.warn(obj, msg),
-  error: (obj, msg) => app.log.error(obj, msg),
-});
-
-app = await buildApp({
+const app = await buildApp({
   env,
   bus,
   handlers: createHandlers({
@@ -48,17 +46,11 @@ app = await buildApp({
   }),
   healthChecks: {
     supabase: supabaseHealth(supabase),
-    redis: async () => {
-      await bus.redis.ping();
-    },
+    redis: redis.check,
   },
-  logger: {
-    level: env.LOG_LEVEL,
-    ...(pretty && { transport: { target: 'pino-pretty' } }),
-  },
+  loggerInstance: log,
 });
-// ioredis reconnects on its own; log instead of crashing on an unhandled 'error' event.
-bus.redis.on('error', (err) => app.log.warn({ err: err.message }, 'redis error'));
+app.addHook('onClose', redis.close);
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, async () => {

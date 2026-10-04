@@ -118,7 +118,11 @@ export class DebriefDriver {
     return this.queue.run(ev.session_id, async () => {
       if (this.states.has(ev.session_id)) return;
       const session = await this.deps.store.getSession(ev.session_id);
-      if (!session?.expert_id) throw new Error(`capture session ${ev.session_id} not found or has no expert`);
+      if (!session?.expert_id) {
+        // Retrying can't create the session row, so skip instead of failing into the dead-letter stream.
+        log.warn('debrief started for a session that is unknown or has no expert; ignoring');
+        return;
+      }
       const row = await this.deps.store.findWorkMapBySession(session.id);
       if (row?.status !== 'in_debrief') {
         log.warn({ workmap_id: row?.id, status: row?.status }, 'debrief started without a Work Map in debrief; ignoring');
@@ -441,7 +445,7 @@ export class DebriefDriver {
 
   private async confirm(st: State, turn: DebriefTurn): Promise<void> {
     st.workmap = { ...st.workmap, status: 'confirmed', confirmed_turn_id: turn.turn_id };
-    await this.deps.store.updateWorkMap(st.workmap.id, { status: 'confirmed', json: st.workmap });
+    await this.deps.store.updateWorkMap(st.workmap.id, { status: 'confirmed', json: st.workmap, confirmed_turn_id: turn.turn_id });
     st.log.info({ confirmed_turn_id: turn.turn_id }, 'work map confirmed');
     // The Work Map page reads the normalized rows; publish writes them again in any case.
     await syncWorkMapRows(this.deps.store, {

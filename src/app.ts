@@ -1,4 +1,4 @@
-import Fastify, { LogController, type FastifyError, type FastifyServerOptions } from 'fastify';
+import Fastify, { LogController, type FastifyBaseLogger, type FastifyError, type FastifyServerOptions } from 'fastify';
 import {
   hasZodFastifySchemaValidationErrors,
   serializerCompiler,
@@ -27,6 +27,8 @@ export type AppDeps = {
   healthChecks: Record<string, HealthCheck>;
   /** Defaults to a runner logging through the app's logger. */
   jobs?: JobRunner;
+  /** The service's shared pino logger (server, dev:mock); tests pass `logger` options instead. */
+  loggerInstance?: FastifyBaseLogger;
   logger?: FastifyServerOptions['logger'];
 };
 
@@ -35,9 +37,15 @@ export async function buildApp(deps: AppDeps) {
 
   const logger = deps.logger ?? { level: env.LOG_LEVEL };
   const app = Fastify({
-    // Every line names the service and version; Railway shows all services in one stream.
-    logger:
-      typeof logger === 'object' ? { ...logger, base: { service: 'sidekik-mapper', version: VERSION, pid: process.pid } } : logger,
+    ...(deps.loggerInstance
+      ? { loggerInstance: deps.loggerInstance }
+      : {
+          // Every line names the service and version; Railway shows all services in one stream.
+          logger:
+            typeof logger === 'object'
+              ? { ...logger, base: { service: 'sidekik-mapper', version: VERSION, pid: process.pid } }
+              : logger,
+        }),
     // registerRequestLogging writes one line per request instead of Fastify's two.
     logController: new LogController({ disableRequestLogging: true, requestIdLogLabel: 'req_id' }),
     genReqId,
